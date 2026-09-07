@@ -14,6 +14,29 @@ struct CoverArt: View {
 
     var body: some View {
         ZStack {
+            if let artworkURL = song.artworkURL {
+                AsyncImage(url: artworkURL) { phase in
+                    if let image = phase.image {
+                        image.resizable().scaledToFill()
+                    } else {
+                        placeholder
+                    }
+                }
+            } else {
+                placeholder
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: size * 0.18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: size * 0.18, style: .continuous)
+                .stroke(.white.opacity(0.12), lineWidth: 1)
+        }
+        .shadow(color: song.colors.first?.opacity(0.3) ?? .clear, radius: 24, y: 12)
+    }
+
+    private var placeholder: some View {
+        ZStack {
             LinearGradient(colors: song.colors, startPoint: .topLeading, endPoint: .bottomTrailing)
             Circle()
                 .fill(.white.opacity(0.16))
@@ -24,13 +47,6 @@ struct CoverArt: View {
                 .font(.system(size: size * 0.25, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.9))
         }
-        .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: size * 0.18, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: size * 0.18, style: .continuous)
-                .stroke(.white.opacity(0.12), lineWidth: 1)
-        }
-        .shadow(color: song.colors.first?.opacity(0.3) ?? .clear, radius: 24, y: 12)
     }
 }
 

@@ -7,13 +7,31 @@ struct Song: Identifiable, Hashable {
     let artist: String
     let colors: [Color]
     let symbol: String
+    let musicItemID: String?
+    let artworkURL: URL?
+    let previewURL: URL?
+    let appleMusicURL: URL?
 
-    init(id: UUID = UUID(), title: String, artist: String, colors: [Color], symbol: String = "waveform") {
+    init(
+        id: UUID = UUID(),
+        title: String,
+        artist: String,
+        colors: [Color],
+        symbol: String = "waveform",
+        musicItemID: String? = nil,
+        artworkURL: URL? = nil,
+        previewURL: URL? = nil,
+        appleMusicURL: URL? = nil
+    ) {
         self.id = id
         self.title = title
         self.artist = artist
         self.colors = colors
         self.symbol = symbol
+        self.musicItemID = musicItemID
+        self.artworkURL = artworkURL
+        self.previewURL = previewURL
+        self.appleMusicURL = appleMusicURL
     }
 }
 

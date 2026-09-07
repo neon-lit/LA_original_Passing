@@ -1,4 +1,5 @@
 import SwiftUI
+import MusicKit
 
 struct OnboardingView: View {
     @EnvironmentObject private var store: PassingStore
@@ -32,7 +33,11 @@ struct OnboardingView: View {
                     detail: "Apple Musicと連携すると、曲の再生やイベントごとのプレイリスト作成ができます。",
                     buttonTitle: store.isMusicConnected ? "連携済み" : "Apple Musicと連携",
                     isComplete: store.isMusicConnected
-                ) { store.isMusicConnected = true }
+                ) {
+                    Task {
+                        store.isMusicConnected = await MusicAuthorization.request() == .authorized
+                    }
+                }
                 .tag(3)
                 PermissionStep(
                     icon: "location.fill",
@@ -143,12 +148,9 @@ private struct GenreStep: View {
 
 private struct SongSelectionStep: View {
     @EnvironmentObject private var store: PassingStore
+    @EnvironmentObject private var previewPlayer: PreviewPlayer
+    @StateObject private var searchService = AppleMusicSearchService()
     @State private var query = ""
-
-    private var results: [Song] {
-        guard !query.isEmpty else { return Song.samples }
-        return Song.samples.filter { $0.title.localizedCaseInsensitiveContains(query) || $0.artist.localizedCaseInsensitiveContains(query) }
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -165,24 +167,54 @@ private struct SongSelectionStep: View {
             .clipShape(RoundedRectangle(cornerRadius: 16))
             ScrollView {
                 LazyVStack(spacing: 10) {
-                    ForEach(results) { song in
-                        Button { store.todaySong = song } label: {
-                            HStack(spacing: 14) {
-                                CoverArt(song: song, size: 58)
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(song.title).font(.headline).lineLimit(1)
-                                    Text(song.artist).font(.subheadline).foregroundStyle(PassingColors.secondaryText)
-                                }
-                                Spacer()
-                                Image(systemName: store.todaySong.id == song.id ? "checkmark.circle.fill" : "circle")
-                                    .font(.title2)
-                                    .foregroundStyle(store.todaySong.id == song.id ? PassingColors.lime : .white.opacity(0.3))
-                            }
-                            .padding(10)
-                            .background(store.todaySong.id == song.id ? PassingColors.lime.opacity(0.08) : .clear)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                    if query.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "music.note.list").font(.largeTitle).foregroundStyle(PassingColors.lime)
+                            Text("Apple Musicから曲を検索").font(.headline)
+                            Text("曲名またはアーティスト名を入力してください")
+                                .font(.caption)
+                                .foregroundStyle(PassingColors.secondaryText)
                         }
-                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 44)
+                    } else if searchService.isSearching {
+                        ProgressView("Apple Musicを検索中…").tint(PassingColors.lime).padding(.top, 44)
+                    } else if let errorMessage = searchService.errorMessage {
+                        ContentUnavailableView("検索結果", systemImage: "music.note", description: Text(errorMessage))
+                    }
+
+                    ForEach(searchService.results) { song in
+                        HStack(spacing: 14) {
+                            Button { store.todaySong = song } label: {
+                                HStack(spacing: 14) {
+                                    CoverArt(song: song, size: 58)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(song.title).font(.headline).lineLimit(1)
+                                        Text(song.artist).font(.subheadline).foregroundStyle(PassingColors.secondaryText).lineLimit(1)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            Spacer()
+                            if song.previewURL != nil {
+                                Button { previewPlayer.toggle(song: song) } label: {
+                                    if previewPlayer.loadingSongID == song.id {
+                                        ProgressView().tint(PassingColors.lime)
+                                    } else {
+                                        Image(systemName: previewPlayer.playingSongID == song.id ? "pause.circle.fill" : "play.circle.fill")
+                                            .font(.title2)
+                                    }
+                                }
+                            }
+                            Button { store.todaySong = song } label: {
+                                Image(systemName: store.todaySong.musicItemID == song.musicItemID ? "checkmark.circle.fill" : "circle")
+                                    .font(.title2)
+                                    .foregroundStyle(store.todaySong.musicItemID == song.musicItemID ? PassingColors.lime : .white.opacity(0.3))
+                            }
+                        }
+                        .padding(10)
+                        .background(store.todaySong.musicItemID == song.musicItemID ? PassingColors.lime.opacity(0.08) : .clear)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
                     }
                 }
             }
@@ -190,6 +222,16 @@ private struct SongSelectionStep: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 24)
+        .task(id: query) {
+            guard !query.isEmpty else {
+                await searchService.search(for: "")
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(450))
+            guard !Task.isCancelled else { return }
+            await searchService.search(for: query)
+        }
+        .onDisappear { previewPlayer.stop() }
     }
 }
 

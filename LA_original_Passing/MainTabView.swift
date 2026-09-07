@@ -14,6 +14,7 @@ struct MainTabView: View {
 
 private struct HomeView: View {
     @EnvironmentObject private var store: PassingStore
+    @EnvironmentObject private var previewPlayer: PreviewPlayer
     @State private var showSongPicker = false
 
     var body: some View {
@@ -44,7 +45,10 @@ private struct HomeView: View {
                 .foregroundStyle(PassingColors.secondaryText)
                 .padding(.top, 5)
             HStack(spacing: 12) {
-                Button {} label: { Label("試聴", systemImage: "play.fill") }
+                Button { previewPlayer.toggle(song: store.todaySong) } label: {
+                    PreviewButtonLabel(song: store.todaySong)
+                }
+                .disabled(store.todaySong.previewURL == nil)
                 Button { showSongPicker = true } label: { Label("曲を変更", systemImage: "arrow.triangle.2.circlepath") }
             }
             .buttonStyle(HomeCapsuleButtonStyle())
@@ -82,29 +86,50 @@ private struct HomeCapsuleButtonStyle: ButtonStyle {
 
 struct SongPickerSheet: View {
     @EnvironmentObject private var store: PassingStore
+    @EnvironmentObject private var previewPlayer: PreviewPlayer
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var searchService = AppleMusicSearchService()
     @State private var query = ""
-
-    private var filteredSongs: [Song] {
-        Song.samples.filter {
-            query.isEmpty || $0.title.localizedCaseInsensitiveContains(query) || $0.artist.localizedCaseInsensitiveContains(query)
-        }
-    }
 
     var body: some View {
         NavigationStack {
             List {
-                ForEach(filteredSongs) { song in
-                    Button {
-                        store.todaySong = song
-                        dismiss()
-                    } label: {
-                        HStack(spacing: 14) {
+                if query.isEmpty {
+                    ContentUnavailableView("Apple Musicから検索", systemImage: "music.note", description: Text("曲名またはアーティスト名を入力してください"))
+                        .listRowBackground(Color.clear)
+                } else if searchService.isSearching {
+                    HStack { Spacer(); ProgressView("検索中…"); Spacer() }
+                        .listRowBackground(Color.clear)
+                } else if let errorMessage = searchService.errorMessage {
+                    ContentUnavailableView("検索結果", systemImage: "music.note", description: Text(errorMessage))
+                        .listRowBackground(Color.clear)
+                }
+
+                ForEach(searchService.results) { song in
+                    HStack(spacing: 14) {
+                        Button {
+                            store.todaySong = song
+                            previewPlayer.stop()
+                            dismiss()
+                        } label: {
                             CoverArt(song: song, size: 54)
                             VStack(alignment: .leading) {
-                                Text(song.title).font(.headline)
-                                Text(song.artist).foregroundStyle(.secondary)
+                                Text(song.title).font(.headline).lineLimit(1)
+                                Text(song.artist).foregroundStyle(.secondary).lineLimit(1)
                             }
+                        }
+                        .buttonStyle(.plain)
+                        Spacer()
+                        if song.previewURL != nil {
+                            Button { previewPlayer.toggle(song: song) } label: {
+                                if previewPlayer.loadingSongID == song.id {
+                                    ProgressView().tint(PassingColors.lime)
+                                } else {
+                                    Image(systemName: previewPlayer.playingSongID == song.id ? "pause.circle.fill" : "play.circle.fill")
+                                        .font(.title2)
+                                }
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                     .listRowBackground(Color.clear)
@@ -121,5 +146,15 @@ struct SongPickerSheet: View {
             .passingBackground()
         }
         .preferredColorScheme(.dark)
+        .task(id: query) {
+            guard !query.isEmpty else {
+                await searchService.search(for: "")
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(450))
+            guard !Task.isCancelled else { return }
+            await searchService.search(for: query)
+        }
+        .onDisappear { previewPlayer.stop() }
     }
 }

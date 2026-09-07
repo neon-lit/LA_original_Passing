@@ -2,11 +2,25 @@ import SwiftUI
 
 struct MemoryListView: View {
     @EnvironmentObject private var store: PassingStore
+    @State private var sortOrder: MemorySortOrder = .newest
+
+    private var sortedMemories: [PassingMemory] {
+        switch sortOrder {
+        case .newest:
+            store.memories.sorted { $0.date > $1.date }
+        case .oldest:
+            store.memories.sorted { $0.date < $1.date }
+        case .mostPeople:
+            store.memories.sorted { $0.peopleCount > $1.peopleCount }
+        case .mostSongs:
+            store.memories.sorted { $0.songs.count > $1.songs.count }
+        }
+    }
 
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 14) {
-                ForEach(store.memories) { memory in
+                ForEach(sortedMemories) { memory in
                     NavigationLink(value: memory) { MemoryCard(memory: memory) }
                         .buttonStyle(.plain)
                 }
@@ -14,10 +28,50 @@ struct MemoryListView: View {
             .padding(20)
         }
         .navigationTitle("メモリー")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Picker("表示順", selection: $sortOrder) {
+                        ForEach(MemorySortOrder.allCases) { order in
+                            Label(order.title, systemImage: order.symbol).tag(order)
+                        }
+                    }
+                } label: {
+                    Label("並び替え", systemImage: "arrow.up.arrow.down")
+                }
+            }
+        }
         .navigationDestination(for: PassingMemory.self) { memory in
             MemoryDetailView(memory: memory)
         }
         .passingBackground()
+    }
+}
+
+private enum MemorySortOrder: String, CaseIterable, Identifiable {
+    case newest
+    case oldest
+    case mostPeople
+    case mostSongs
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .newest: "新しい順"
+        case .oldest: "古い順"
+        case .mostPeople: "人数が多い順"
+        case .mostSongs: "曲数が多い順"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .newest: "calendar.badge.clock"
+        case .oldest: "calendar"
+        case .mostPeople: "person.2.fill"
+        case .mostSongs: "music.note.list"
+        }
     }
 }
 
@@ -119,6 +173,10 @@ private struct SongRow: View {
 
 private struct SongDetailView: View {
     let item: EncounteredSong
+    @EnvironmentObject private var previewPlayer: PreviewPlayer
+    @Environment(\.openURL) private var openURL
+    @State private var isOpeningAppleMusic = false
+    @State private var showAppleMusicError = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -136,14 +194,40 @@ private struct SongDetailView: View {
                 .foregroundStyle(PassingColors.lime)
                 .padding(.top, 18)
             Spacer()
-            Button {} label: { Label("試聴する", systemImage: "play.fill") }
+            Button { previewPlayer.toggle(song: item.song) } label: {
+                PreviewButtonLabel(song: item.song, title: "試聴する")
+            }
                 .buttonStyle(PrimaryButtonStyle(destructive: true))
-            Button {} label: { Label("Apple Musicで聴く", systemImage: "arrow.up.right") }
+                .disabled(item.song.previewURL == nil)
+            Button {
+                Task {
+                    isOpeningAppleMusic = true
+                    if let url = await AppleMusicLinkResolver.resolveURL(for: item.song) {
+                        openURL(url)
+                    } else {
+                        showAppleMusicError = true
+                    }
+                    isOpeningAppleMusic = false
+                }
+            } label: {
+                if isOpeningAppleMusic {
+                    Label("Apple Musicを開いています", systemImage: "hourglass")
+                } else {
+                    Label("Apple Musicで聴く", systemImage: "arrow.up.right")
+                }
+            }
                 .buttonStyle(PrimaryButtonStyle())
                 .padding(.top, 10)
+                .disabled(isOpeningAppleMusic)
         }
         .padding(22)
         .navigationBarTitleDisplayMode(.inline)
         .passingBackground()
+        .onDisappear { previewPlayer.stop() }
+        .alert("Apple Musicで開けません", isPresented: $showAppleMusicError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("この曲のApple Musicリンクを取得できませんでした。")
+        }
     }
 }
