@@ -1,24 +1,17 @@
-//
-//  ContentView.swift
-//  LA_original_Passing
-//
-//  Created by Taira Enon on 2026/09/07.
-//
-
 import SwiftUI
 
 struct ContentView: View {
-    var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
-    }
-}
+    @StateObject private var store = PassingStore()
 
-#Preview {
-    ContentView()
+    var body: some View {
+        Group {
+            if store.hasCompletedOnboarding {
+                MainTabView()
+            } else {
+                OnboardingView()
+            }
+        }
+        .environmentObject(store)
+        .preferredColorScheme(.dark)
+    }
 }
