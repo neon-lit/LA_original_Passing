@@ -1,14 +1,32 @@
 import SwiftUI
+import UIKit
+import CoreLocation
 
 struct SettingsView: View {
     @EnvironmentObject private var store: PassingStore
+    @EnvironmentObject private var locationService: LocationService
+    @Environment(\.openURL) private var openURL
     @State private var showSongPicker = false
 
     var body: some View {
         List {
             Section("連携") {
-                Toggle(isOn: $store.isMusicConnected) { Label("Apple Music", systemImage: "music.note") }
-                Toggle(isOn: $store.isLocationEnabled) { Label("位置情報", systemImage: "location.fill") }
+                Button {
+                    if locationService.authorizationStatus == .notDetermined {
+                        locationService.requestPermission()
+                    } else if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                        openURL(settingsURL)
+                    }
+                } label: {
+                    HStack {
+                        Label("位置情報", systemImage: "location.fill")
+                        Spacer()
+                        Text(locationService.statusText)
+                            .font(.subheadline)
+                            .foregroundStyle(locationService.isAuthorized ? PassingColors.lime : .secondary)
+                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
                 Toggle(isOn: $store.notificationsEnabled) { Label("通知", systemImage: "bell.fill") }
             }
             Section("音楽") {

@@ -3,8 +3,8 @@ import SwiftUI
 enum PassingColors {
     static let background = Color(red: 0.035, green: 0.04, blue: 0.065)
     static let surface = Color.white.opacity(0.075)
-    static let lime = Color(red: 0.78, green: 1.0, blue: 0.25)
-    static let violet = Color(red: 0.56, green: 0.32, blue: 1.0)
+    static let lime = Color(red: 0.24, green: 0.68, blue: 1.0)
+    static let violet = Color(red: 0.18, green: 0.38, blue: 0.92)
     static let secondaryText = Color.white.opacity(0.58)
 }
 

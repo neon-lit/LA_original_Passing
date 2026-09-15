@@ -1,7 +1,12 @@
 import Foundation
 import SwiftUI
 
-struct Song: Identifiable, Hashable {
+enum AppTab: Hashable {
+    case home
+    case memory
+}
+
+struct Song: Identifiable, Hashable, Codable {
     let id: UUID
     let title: String
     let artist: String
@@ -33,9 +38,38 @@ struct Song: Identifiable, Hashable {
         self.previewURL = previewURL
         self.appleMusicURL = appleMusicURL
     }
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, artist, symbol, musicItemID, artworkURL, previewURL, appleMusicURL
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        artist = try container.decode(String.self, forKey: .artist)
+        symbol = try container.decode(String.self, forKey: .symbol)
+        musicItemID = try container.decodeIfPresent(String.self, forKey: .musicItemID)
+        artworkURL = try container.decodeIfPresent(URL.self, forKey: .artworkURL)
+        previewURL = try container.decodeIfPresent(URL.self, forKey: .previewURL)
+        appleMusicURL = try container.decodeIfPresent(URL.self, forKey: .appleMusicURL)
+        colors = [.blue, .indigo]
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encode(artist, forKey: .artist)
+        try container.encode(symbol, forKey: .symbol)
+        try container.encodeIfPresent(musicItemID, forKey: .musicItemID)
+        try container.encodeIfPresent(artworkURL, forKey: .artworkURL)
+        try container.encodeIfPresent(previewURL, forKey: .previewURL)
+        try container.encodeIfPresent(appleMusicURL, forKey: .appleMusicURL)
+    }
 }
 
-struct EncounteredSong: Identifiable, Hashable {
+struct EncounteredSong: Identifiable, Hashable, Codable {
     let id: UUID
     let song: Song
     let encounteredAt: Date
@@ -47,7 +81,7 @@ struct EncounteredSong: Identifiable, Hashable {
     }
 }
 
-struct PassingMemory: Identifiable, Hashable {
+struct PassingMemory: Identifiable, Hashable, Codable {
     let id: UUID
     var eventName: String
     let venue: String
@@ -65,7 +99,7 @@ struct PassingMemory: Identifiable, Hashable {
     }
 }
 
-enum MusicGenre: String, CaseIterable, Identifiable {
+enum MusicGenre: String, CaseIterable, Identifiable, Codable {
     case rock = "ロック"
     case jpop = "J-POP"
     case hiphop = "HIPHOP"

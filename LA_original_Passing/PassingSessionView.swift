@@ -1,14 +1,14 @@
 import SwiftUI
-import Combine
 
 struct PassingSessionView: View {
     @EnvironmentObject private var store: PassingStore
+    @EnvironmentObject private var locationService: LocationService
+    @EnvironmentObject private var nearbyService: NearbyPassingService
     @Environment(\.dismiss) private var dismiss
     @State private var animateRings = false
     @State private var showFinishSheet = false
     @State private var eventName = ""
-
-    private let discoveryTimer = Timer.publish(every: 4, on: .main, in: .common).autoconnect()
+    @State private var venueName = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -16,8 +16,12 @@ struct PassingSessionView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("PASSING中").font(.headline)
                     HStack(spacing: 6) {
-                        Circle().fill(PassingColors.lime).frame(width: 7)
-                        Text("位置情報を取得しています").font(.caption).foregroundStyle(PassingColors.secondaryText)
+                        Circle()
+                            .fill(locationService.isTracking ? PassingColors.lime : .orange)
+                            .frame(width: 7)
+                        Text(statusText)
+                            .font(.caption)
+                            .foregroundStyle(PassingColors.secondaryText)
                     }
                 }
                 Spacer()
@@ -47,7 +51,7 @@ struct PassingSessionView: View {
             }
             .frame(height: 360)
             Text("近くの音楽を探しています").font(.title2.bold())
-            Text("画面を閉じても、そのままで大丈夫です")
+            Text(nearbyService.connectedPeerCount > 0 ? "近くに \(nearbyService.connectedPeerCount) 台のPASSINGを検出" : "BluetoothとWi-Fiをオンにしてください")
                 .font(.subheadline)
                 .foregroundStyle(PassingColors.secondaryText)
                 .padding(.top, 7)
@@ -61,7 +65,10 @@ struct PassingSessionView: View {
             .clipShape(RoundedRectangle(cornerRadius: 22))
             .padding(22)
             Spacer()
-            Button("PASSINGを終了") { showFinishSheet = true }
+            Button("PASSINGを終了") {
+                venueName = locationService.displayPlace
+                showFinishSheet = true
+            }
                 .buttonStyle(PrimaryButtonStyle(destructive: true))
                 .padding(22)
         }
@@ -69,14 +76,46 @@ struct PassingSessionView: View {
         .navigationBarBackButtonHidden()
         .onAppear {
             store.startPassing()
+            locationService.startTracking()
+            nearbyService.start(song: store.todaySong, location: locationService.lastLocation)
             animateRings = true
         }
-        .onReceive(discoveryTimer) { _ in store.discoverSong() }
+        .onReceive(locationService.$lastLocation) { location in
+            nearbyService.updateLocation(location)
+        }
+        .onReceive(nearbyService.$encounters) { encounters in
+            for encounter in encounters {
+                store.recordEncounter(
+                    song: encounter.song,
+                    peerID: encounter.id,
+                    encounteredAt: encounter.encounteredAt
+                )
+            }
+        }
         .sheet(isPresented: $showFinishSheet) {
             finishSheet
                 .presentationDetents([.height(380)])
                 .presentationDragIndicator(.visible)
         }
+        .alert(
+            "近距離通信エラー",
+            isPresented: Binding(
+                get: { nearbyService.errorMessage != nil },
+                set: { isPresented in
+                    if !isPresented { nearbyService.clearError() }
+                }
+            )
+        ) {
+            Button("OK", role: .cancel) { nearbyService.clearError() }
+        } message: {
+            Text(nearbyService.errorMessage ?? "")
+        }
+    }
+
+    private var statusText: String {
+        if !locationService.isTracking { return "位置情報の許可を確認中" }
+        if nearbyService.isRunning { return "位置情報・近距離通信を使用中" }
+        return "近距離通信を準備中"
     }
 
     private func counter(value: Int, label: String) -> some View {
@@ -95,14 +134,21 @@ struct PassingSessionView: View {
                 .padding(16)
                 .background(PassingColors.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-            Text("イベント名は後からメモリーで変更できます。")
-                .font(.caption)
-                .foregroundStyle(PassingColors.secondaryText)
+            Text("会場・場所").font(.caption.bold()).foregroundStyle(PassingColors.secondaryText)
+            TextField("建物名または住所", text: $venueName)
+                .padding(16)
+                .background(PassingColors.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
             Spacer()
             Button("保存して終了") {
-                store.finishPassing(eventName: eventName)
+                store.finishPassing(eventName: eventName, venue: venueName)
+                locationService.stopTracking()
+                nearbyService.stop()
                 showFinishSheet = false
                 dismiss()
+                DispatchQueue.main.async {
+                    store.selectedTab = .memory
+                }
             }
             .buttonStyle(PrimaryButtonStyle())
         }

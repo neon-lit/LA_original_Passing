@@ -19,13 +19,22 @@ struct MemoryListView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 14) {
-                ForEach(sortedMemories) { memory in
-                    NavigationLink(value: memory) { MemoryCard(memory: memory) }
-                        .buttonStyle(.plain)
+            if sortedMemories.isEmpty {
+                ContentUnavailableView(
+                    "まだメモリーがありません",
+                    systemImage: "sparkles.rectangle.stack",
+                    description: Text("PASSINGを終了すると、出会った曲と場所がここに保存されます。")
+                )
+                .padding(.top, 120)
+            } else {
+                LazyVStack(spacing: 14) {
+                    ForEach(sortedMemories) { memory in
+                        NavigationLink(value: memory) { MemoryCard(memory: memory) }
+                            .buttonStyle(.plain)
+                    }
                 }
+                .padding(20)
             }
-            .padding(20)
         }
         .navigationTitle("メモリー")
         .toolbar {
@@ -110,7 +119,21 @@ private struct MemoryCard: View {
 
 private struct MemoryDetailView: View {
     let memory: PassingMemory
-    @State private var showPlaylistAlert = false
+    @EnvironmentObject private var store: PassingStore
+    @Environment(\.openURL) private var openURL
+    @StateObject private var playlistService = AppleMusicPlaylistService()
+    @State private var showPlaylistNameSheet = false
+    @State private var showMemoryNameSheet = false
+    @State private var playlistName: String
+    @State private var memoryName: String
+    @State private var hasCreatedPlaylist: Bool
+
+    init(memory: PassingMemory) {
+        self.memory = memory
+        _playlistName = State(initialValue: AppleMusicPlaylistService.savedName(for: memory.id) ?? memory.eventName)
+        _memoryName = State(initialValue: memory.eventName)
+        _hasCreatedPlaylist = State(initialValue: AppleMusicPlaylistService.hasPlaylist(for: memory.id))
+    }
 
     var body: some View {
         ScrollView {
@@ -119,14 +142,20 @@ private struct MemoryDetailView: View {
                     Text(memory.date.formatted(.dateTime.year().month().day()))
                         .font(.subheadline.bold())
                         .foregroundStyle(PassingColors.lime)
-                    Text(memory.eventName).font(.system(size: 32, weight: .black, design: .rounded))
+                    Text(memoryName).font(.system(size: 32, weight: .black, design: .rounded))
                     Label(memory.venue, systemImage: "mappin.and.ellipse").foregroundStyle(PassingColors.secondaryText)
                     Text("\(memory.peopleCount)人の \(memory.songs.count)曲と出会いました")
                         .font(.headline)
                         .padding(.top, 8)
                 }
-                Button { showPlaylistAlert = true } label: {
-                    Label("Apple Musicにプレイリストを作成", systemImage: "music.note.list")
+                Button {
+                    playlistService.clearError()
+                    showPlaylistNameSheet = true
+                } label: {
+                    Label(
+                        hasCreatedPlaylist ? "プレイリスト名・内容を変更" : "Apple Musicにプレイリストを作成",
+                        systemImage: hasCreatedPlaylist ? "pencil.and.list.clipboard" : "music.note.list"
+                    )
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 Text("出会った曲").font(.title3.bold()).padding(.top, 6)
@@ -140,15 +169,105 @@ private struct MemoryDetailView: View {
             .padding(20)
         }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showMemoryNameSheet = true
+                } label: {
+                    Label("メモリー名を変更", systemImage: "pencil")
+                }
+            }
+        }
         .navigationDestination(for: EncounteredSong.self) { item in
             SongDetailView(item: item)
         }
         .passingBackground()
-        .alert("プレイリストを作成しました", isPresented: $showPlaylistAlert) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("「PASSING — \(memory.eventName)」をApple Musicに追加しました。")
+        .sheet(isPresented: $showPlaylistNameSheet) {
+            playlistNameSheet
+                .presentationDetents([.height(390)])
+                .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $showMemoryNameSheet) {
+            memoryNameSheet
+                .presentationDetents([.height(310)])
+                .presentationDragIndicator(.visible)
+        }
+    }
+
+    private var memoryNameSheet: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("メモリー名を変更")
+                .font(.title2.bold())
+            Text("イベント・ライブ名")
+                .font(.caption.bold())
+                .foregroundStyle(PassingColors.secondaryText)
+            TextField("メモリー名", text: $memoryName)
+                .padding(16)
+                .background(PassingColors.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            Spacer()
+            Button("変更を保存") {
+                let trimmedName = memoryName.trimmingCharacters(in: .whitespacesAndNewlines)
+                store.renameMemory(id: memory.id, to: trimmedName)
+                memoryName = trimmedName
+                if !hasCreatedPlaylist {
+                    playlistName = trimmedName
+                }
+                showMemoryNameSheet = false
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .disabled(memoryName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+        .padding(24)
+        .passingBackground()
+    }
+
+    private var playlistNameSheet: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text(hasCreatedPlaylist ? "プレイリストを変更" : "プレイリストを作成")
+                .font(.title2.bold())
+            Text("プレイリスト名")
+                .font(.caption.bold())
+                .foregroundStyle(PassingColors.secondaryText)
+            TextField("プレイリスト名", text: $playlistName)
+                .textInputAutocapitalization(.never)
+                .padding(16)
+                .background(PassingColors.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+
+            if let errorMessage = playlistService.errorMessage {
+                Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            } else {
+                Text(hasCreatedPlaylist ? "名前と収録曲をApple Music側にも反映します。" : "初期値はメモリー名です。好きな名前に変更できます。")
+                    .font(.caption)
+                    .foregroundStyle(PassingColors.secondaryText)
+            }
+
+            Spacer()
+            Button {
+                Task {
+                    if await playlistService.createOrUpdatePlaylist(from: memory, named: playlistName) {
+                        hasCreatedPlaylist = true
+                        showPlaylistNameSheet = false
+                        if let musicURL = playlistService.playlistURL ?? URL(string: "music://") {
+                            openURL(musicURL)
+                        }
+                    }
+                }
+            } label: {
+                if playlistService.isCreating {
+                    Label(hasCreatedPlaylist ? "変更中" : "作成中", systemImage: "hourglass")
+                } else {
+                    Label(hasCreatedPlaylist ? "変更を保存" : "この名前で作成", systemImage: "music.note.list")
+                }
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .disabled(playlistService.isCreating || playlistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+        .padding(24)
+        .passingBackground()
     }
 }
 

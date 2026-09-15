@@ -1,8 +1,8 @@
 import SwiftUI
-import MusicKit
 
 struct OnboardingView: View {
     @EnvironmentObject private var store: PassingStore
+    @EnvironmentObject private var locationService: LocationService
     @State private var step = 0
 
     var body: some View {
@@ -10,14 +10,14 @@ struct OnboardingView: View {
             HStack {
                 PassingLogo()
                 Spacer()
-                Text("\(step + 1) / 5")
+                Text("\(step + 1) / 4")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(PassingColors.secondaryText)
             }
             .padding(.horizontal, 24)
             .padding(.top, 18)
 
-            ProgressView(value: Double(step + 1), total: 5)
+            ProgressView(value: Double(step + 1), total: 4)
                 .tint(PassingColors.lime)
                 .padding(.horizontal, 24)
                 .padding(.top, 18)
@@ -27,27 +27,14 @@ struct OnboardingView: View {
                 GenreStep().tag(1)
                 SongSelectionStep().tag(2)
                 PermissionStep(
-                    icon: "music.note",
-                    eyebrow: "APPLE MUSIC",
-                    title: "出会った曲を、\nそのまま聴こう。",
-                    detail: "Apple Musicと連携すると、曲の再生やイベントごとのプレイリスト作成ができます。",
-                    buttonTitle: store.isMusicConnected ? "連携済み" : "Apple Musicと連携",
-                    isComplete: store.isMusicConnected
-                ) {
-                    Task {
-                        store.isMusicConnected = await MusicAuthorization.request() == .authorized
-                    }
-                }
-                .tag(3)
-                PermissionStep(
                     icon: "location.fill",
                     eyebrow: "LOCATION",
                     title: "近くにいた音楽と、\nすれ違うために。",
                     detail: "位置情報はPASSING中だけ使用します。あなたの行動履歴や正確な位置が他の人に表示されることはありません。",
-                    buttonTitle: store.isLocationEnabled ? "設定済み" : "位置情報を許可",
-                    isComplete: store.isLocationEnabled
-                ) { store.isLocationEnabled = true }
-                .tag(4)
+                    buttonTitle: locationService.isAuthorized ? "設定済み" : "位置情報を許可",
+                    isComplete: locationService.isAuthorized
+                ) { locationService.requestPermission() }
+                .tag(3)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
 
@@ -64,18 +51,20 @@ struct OnboardingView: View {
                     }
                 }
                 Button {
-                    if step == 4 {
+                    if step == 3 {
                         store.hasCompletedOnboarding = true
                     } else {
                         withAnimation { step += 1 }
                     }
                 } label: {
                     HStack {
-                        Text(step == 4 ? "PASSINGをはじめる" : "次へ")
+                        Text(step == 3 ? "PASSINGをはじめる" : "次へ")
                         Image(systemName: "arrow.right")
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())
+                .disabled(step == 3 && !locationService.isAuthorized)
+                .opacity(step == 3 && !locationService.isAuthorized ? 0.45 : 1)
             }
             .padding(24)
         }
@@ -152,6 +141,13 @@ private struct SongSelectionStep: View {
     @StateObject private var searchService = AppleMusicSearchService()
     @State private var query = ""
 
+    private var searchContext: SongSearchContext {
+        SongSearchContext(
+            query: query,
+            genres: store.selectedGenres.map(\.rawValue).sorted()
+        )
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Spacer(minLength: 22)
@@ -167,20 +163,19 @@ private struct SongSelectionStep: View {
             .clipShape(RoundedRectangle(cornerRadius: 16))
             ScrollView {
                 LazyVStack(spacing: 10) {
-                    if query.isEmpty {
-                        VStack(spacing: 12) {
-                            Image(systemName: "music.note.list").font(.largeTitle).foregroundStyle(PassingColors.lime)
-                            Text("Apple Musicから曲を検索").font(.headline)
-                            Text("曲名またはアーティスト名を入力してください")
-                                .font(.caption)
-                                .foregroundStyle(PassingColors.secondaryText)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 44)
-                    } else if searchService.isSearching {
+                    if searchService.isSearching {
                         ProgressView("Apple Musicを検索中…").tint(PassingColors.lime).padding(.top, 44)
                     } else if let errorMessage = searchService.errorMessage {
                         ContentUnavailableView("検索結果", systemImage: "music.note", description: Text(errorMessage))
+                    }
+
+                    if query.isEmpty && !searchService.results.isEmpty {
+                        HStack {
+                            Image(systemName: "sparkles").foregroundStyle(PassingColors.lime)
+                            Text("好きなジャンルからおすすめ").font(.subheadline.bold())
+                            Spacer()
+                        }
+                        .padding(.vertical, 6)
                     }
 
                     ForEach(searchService.results) { song in
@@ -222,9 +217,9 @@ private struct SongSelectionStep: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 24)
-        .task(id: query) {
+        .task(id: searchContext) {
             guard !query.isEmpty else {
-                await searchService.search(for: "")
+                await searchService.loadRecommendations(for: store.selectedGenres)
                 return
             }
             try? await Task.sleep(for: .milliseconds(450))
@@ -233,6 +228,11 @@ private struct SongSelectionStep: View {
         }
         .onDisappear { previewPlayer.stop() }
     }
+}
+
+private struct SongSearchContext: Hashable {
+    let query: String
+    let genres: [String]
 }
 
 private struct PermissionStep: View {

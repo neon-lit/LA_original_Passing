@@ -1,12 +1,16 @@
 import SwiftUI
 
 struct MainTabView: View {
+    @EnvironmentObject private var store: PassingStore
+
     var body: some View {
-        TabView {
+        TabView(selection: $store.selectedTab) {
             NavigationStack { HomeView() }
                 .tabItem { Label("ホーム", systemImage: "house.fill") }
+                .tag(AppTab.home)
             NavigationStack { MemoryListView() }
                 .tabItem { Label("メモリー", systemImage: "sparkles.rectangle.stack.fill") }
+                .tag(AppTab.memory)
         }
         .tint(PassingColors.lime)
     }

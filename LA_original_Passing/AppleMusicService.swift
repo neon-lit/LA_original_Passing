@@ -1,6 +1,5 @@
 import AVFoundation
 import Combine
-import MusicKit
 import SwiftUI
 
 @MainActor
@@ -8,12 +7,6 @@ final class AppleMusicSearchService: ObservableObject {
     @Published private(set) var results: [Song] = []
     @Published private(set) var isSearching = false
     @Published private(set) var errorMessage: String?
-    @Published private(set) var authorizationStatus = MusicAuthorization.currentStatus
-
-    func requestAuthorization() async -> Bool {
-        authorizationStatus = await MusicAuthorization.request()
-        return authorizationStatus == .authorized
-    }
 
     func search(for term: String) async {
         let trimmedTerm = term.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -28,21 +21,7 @@ final class AppleMusicSearchService: ObservableObject {
         defer { isSearching = false }
 
         do {
-            var components = URLComponents(string: "https://itunes.apple.com/search")
-            components?.queryItems = [
-                URLQueryItem(name: "term", value: trimmedTerm),
-                URLQueryItem(name: "country", value: "JP"),
-                URLQueryItem(name: "media", value: "music"),
-                URLQueryItem(name: "entity", value: "song"),
-                URLQueryItem(name: "limit", value: "25")
-            ]
-            guard let url = components?.url else { throw URLError(.badURL) }
-            let (data, response) = try await URLSession.shared.data(from: url)
-            guard let httpResponse = response as? HTTPURLResponse,
-                  200..<300 ~= httpResponse.statusCode else {
-                throw URLError(.badServerResponse)
-            }
-            let searchResponse = try JSONDecoder().decode(AppleMusicSearchResponse.self, from: data)
+            let searchResponse = try await fetch(term: trimmedTerm, limit: 25)
             results = searchResponse.results.map(Song.init(searchResult:))
             if results.isEmpty {
                 errorMessage = "曲が見つかりませんでした。"
@@ -50,6 +29,70 @@ final class AppleMusicSearchService: ObservableObject {
         } catch {
             results = []
             errorMessage = "Apple Musicを検索できませんでした。通信環境とMusicKit設定を確認してください。"
+        }
+    }
+
+    func loadRecommendations(for genres: Set<MusicGenre>) async {
+        guard !genres.isEmpty else {
+            results = []
+            return
+        }
+
+        isSearching = true
+        errorMessage = nil
+        defer { isSearching = false }
+
+        do {
+            var recommendations: [AppleMusicSearchResult] = []
+            var usedTrackIDs = Set<Int>()
+
+            for genre in genres.sorted(by: { $0.rawValue < $1.rawValue }).prefix(4) {
+                let response = try await fetch(term: genre.searchTerm, limit: 8)
+                for result in response.results where usedTrackIDs.insert(result.trackID).inserted {
+                    recommendations.append(result)
+                }
+            }
+
+            results = recommendations.prefix(24).map(Song.init(searchResult:))
+            if results.isEmpty {
+                errorMessage = "選択したジャンルの候補が見つかりませんでした。"
+            }
+        } catch {
+            results = []
+            errorMessage = "おすすめを取得できませんでした。通信環境を確認してください。"
+        }
+    }
+
+    private func fetch(term: String, limit: Int) async throws -> AppleMusicSearchResponse {
+        var components = URLComponents(string: "https://itunes.apple.com/search")
+        components?.queryItems = [
+            URLQueryItem(name: "term", value: term),
+            URLQueryItem(name: "country", value: "JP"),
+            URLQueryItem(name: "media", value: "music"),
+            URLQueryItem(name: "entity", value: "song"),
+            URLQueryItem(name: "limit", value: String(limit))
+        ]
+        guard let url = components?.url else { throw URLError(.badURL) }
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let httpResponse = response as? HTTPURLResponse,
+              200..<300 ~= httpResponse.statusCode else {
+            throw URLError(.badServerResponse)
+        }
+        return try JSONDecoder().decode(AppleMusicSearchResponse.self, from: data)
+    }
+}
+
+private extension MusicGenre {
+    var searchTerm: String {
+        switch self {
+        case .rock: "ロック 人気"
+        case .jpop: "J-POP 人気"
+        case .hiphop: "ヒップホップ 人気"
+        case .kpop: "K-POP 人気"
+        case .japaneseRock: "邦ロック 人気"
+        case .electronic: "エレクトロニック 人気"
+        case .alternative: "オルタナティブ 人気"
+        case .rnb: "R&B 人気"
         }
     }
 }
@@ -82,6 +125,18 @@ enum AppleMusicLinkResolver {
             return appleMusicURL
         }
 
+        return await searchResult(for: song)?.trackViewURL
+    }
+
+    static func resolveMusicItemID(for song: Song) async -> String? {
+        if let musicItemID = song.musicItemID {
+            return musicItemID
+        }
+
+        return await searchResult(for: song).map { String($0.trackID) }
+    }
+
+    private static func searchResult(for song: Song) async -> AppleMusicSearchResult? {
         do {
             var components = URLComponents(string: "https://itunes.apple.com/search")
             components?.queryItems = [
@@ -101,7 +156,7 @@ enum AppleMusicLinkResolver {
                 $0.trackName.localizedCaseInsensitiveCompare(song.title) == .orderedSame &&
                 $0.artistName.localizedCaseInsensitiveCompare(song.artist) == .orderedSame
             }
-            return exactMatch?.trackViewURL ?? searchResponse.results.first?.trackViewURL
+            return exactMatch ?? searchResponse.results.first
         } catch {
             return nil
         }
