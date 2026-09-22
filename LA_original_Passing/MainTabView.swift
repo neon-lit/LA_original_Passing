@@ -16,7 +16,7 @@ struct MainTabView: View {
     }
 }
 
-private struct HomeView: View {
+struct HomeView: View {
     @EnvironmentObject private var store: PassingStore
     @EnvironmentObject private var previewPlayer: PreviewPlayer
     @State private var showSongPicker = false

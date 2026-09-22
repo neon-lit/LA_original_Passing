@@ -117,7 +117,7 @@ private struct MemoryCard: View {
     }
 }
 
-private struct MemoryDetailView: View {
+struct MemoryDetailView: View {
     let memory: PassingMemory
     @EnvironmentObject private var store: PassingStore
     @Environment(\.openURL) private var openURL
@@ -290,7 +290,7 @@ private struct SongRow: View {
     }
 }
 
-private struct SongDetailView: View {
+struct SongDetailView: View {
     let item: EncounteredSong
     @EnvironmentObject private var previewPlayer: PreviewPlayer
     @Environment(\.openURL) private var openURL

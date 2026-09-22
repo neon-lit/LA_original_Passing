@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 2,
+  "appName": "PASSING",
+  "themeId": "passing-live",
+  "connectedCanvas": true,
+  "locales": [
+    "ja"
+  ],
+  "locale": "ja",
+  "device": "iphone",
+  "orientation": "portrait",
+  "appIcon": "/app-icon.png",
+  "slidesByDevice": {
+    "iphone": [
+      {
+        "id": "passing-01-hero",
+        "layout": "hero",
+        "label": {
+          "ja": "PASSING"
+        },
+        "headline": {
+          "ja": "すれ違いが\n音楽との出会いになる"
+        },
+        "screenshot": "/screenshots/apple/iphone/{locale}/01.png",
+        "transforms": {
+          "caption": {
+            "x": 9.331364696026858,
+            "y": 298.31085254674474,
+            "width": 1306,
+            "height": 650,
+            "rotation": 0,
+            "zIndex": 2
+          },
+          "device": {
+            "x": 105,
+            "y": 830,
+            "width": 1110,
+            "height": 2261,
+            "rotation": 0,
+            "zIndex": 1
+          }
+        },
+        "headlineFontSize": 128
+      },
+      {
+        "id": "passing-02-live",
+        "layout": "device-top",
+        "label": {
+          "ja": "LIVE MODE"
+        },
+        "headline": {
+          "ja": "同じ空間の誰かが\n1曲を届けてくれる"
+        },
+        "screenshot": "/screenshots/apple/iphone/{locale}/02.png",
+        "transforms": {
+          "device": {
+            "x": 105,
+            "y": -230,
+            "width": 1110,
+            "height": 2261,
+            "zIndex": 3
+          },
+          "caption": {
+            "x": 4.7947034205556065,
+            "y": 2264.005916688831,
+            "width": 1306,
+            "height": 600,
+            "rotation": 0,
+            "zIndex": 4
+          }
+        },
+        "headlineFontSize": 128
+      },
+      {
+        "id": "passing-03-summary",
+        "layout": "device-bottom",
+        "label": {
+          "ja": "32 PEOPLE · 24 SONGS"
+        },
+        "headline": {
+          "ja": "今日だけの出会いを\nそのまま残す"
+        },
+        "screenshot": "/screenshots/apple/iphone/{locale}/03.png",
+        "inverted": true,
+        "transforms": {
+          "caption": {
+            "x": 9.000003975371783,
+            "y": 205.0000038732212,
+            "width": 1302,
+            "height": 620,
+            "rotation": 0,
+            "zIndex": 4
+          },
+          "device": {
+            "x": 500,
+            "y": 760,
+            "width": 950,
+            "height": 1936,
+            "zIndex": 3
+          }
+        },
+        "headlineFontSize": 128
+      },
+      {
+        "id": "passing-04-memory",
+        "layout": "two-devices",
+        "label": {
+          "ja": "MEMORY"
+        },
+        "headline": {
+          "ja": "ライブの余韻を\n曲でたどる"
+        },
+        "screenshot": "/screenshots/apple/iphone/{locale}/05.png",
+        "screenshotSecondary": "/screenshots/apple/iphone/{locale}/04.png",
+        "transforms": {
+          "caption": {
+            "x": 5.000086079148787,
+            "y": 205.0000038732212,
+            "width": 1306,
+            "height": 620,
+            "rotation": 0,
+            "zIndex": 5
+          },
+          "deviceSecondary": {
+            "x": -120,
+            "y": 980,
+            "width": 840,
+            "height": 1712,
+            "rotation": 0,
+            "zIndex": 2
+          },
+          "device": {
+            "x": 530,
+            "y": 830,
+            "width": 900,
+            "height": 1834,
+            "rotation": 0,
+            "zIndex": 3
+          }
+        },
+        "headlineFontSize": 138
+      },
+      {
+        "id": "passing-05-song",
+        "layout": "device-top",
+        "label": {
+          "ja": "ONE SONG"
+        },
+        "headline": {
+          "ja": "知らなかった1曲が\n思い出になる"
+        },
+        "screenshot": "/screenshots/apple/iphone/{locale}/06.png",
+        "transforms": {
+          "device": {
+            "x": 105,
+            "y": -230,
+            "width": 1110,
+            "height": 2261,
+            "zIndex": 3
+          },
+          "caption": {
+            "x": 9.000001379036803,
+            "y": 2100.000051586199,
+            "width": 1306,
+            "height": 600,
+            "rotation": 0,
+            "zIndex": 4
+          }
+        },
+        "headlineFontSize": 128
+      },
+      {
+        "id": "passing-06-playlist",
+        "layout": "device-bottom",
+        "label": {
+          "ja": "APPLE MUSIC"
+        },
+        "headline": {
+          "ja": "帰り道を\n今日のプレイリストに"
+        },
+        "screenshot": "/screenshots/apple/iphone/{locale}/05.png",
+        "inverted": true,
+        "transforms": {
+          "caption": {
+            "x": 8.600108664711115,
+            "y": 229.43999718642402,
+            "width": 1299,
+            "height": 803,
+            "rotation": 0,
+            "zIndex": 4
+          }
+        },
+        "headlineFontSize": 128
+      }
+    ],
+    "android": [],
+    "ipad": [],
+    "android-7": [],
+    "android-10": [],
+    "feature-graphic": []
+  }
+}

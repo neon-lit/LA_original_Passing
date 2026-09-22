@@ -31,7 +31,7 @@ struct OnboardingView: View {
                     eyebrow: "LOCATION",
                     title: "近くにいた音楽と、\nすれ違うために。",
                     detail: "位置情報はPASSING中だけ使用します。あなたの行動履歴や正確な位置が他の人に表示されることはありません。",
-                    buttonTitle: locationService.isAuthorized ? "設定済み" : "位置情報を許可",
+                    buttonTitle: locationService.isAuthorized ? "設定済み" : "続ける",
                     isComplete: locationService.isAuthorized
                 ) { locationService.requestPermission() }
                 .tag(3)
@@ -58,13 +58,11 @@ struct OnboardingView: View {
                     }
                 } label: {
                     HStack {
-                        Text(step == 3 ? "PASSINGをはじめる" : "次へ")
+                        Text(step == 3 && !locationService.isAuthorized ? "あとで設定" : step == 3 ? "PASSINGをはじめる" : "次へ")
                         Image(systemName: "arrow.right")
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                .disabled(step == 3 && !locationService.isAuthorized)
-                .opacity(step == 3 && !locationService.isAuthorized ? 0.45 : 1)
             }
             .padding(24)
         }

@@ -6,9 +6,22 @@ struct PassingSessionView: View {
     @EnvironmentObject private var nearbyService: NearbyPassingService
     @Environment(\.dismiss) private var dismiss
     @State private var animateRings = false
-    @State private var showFinishSheet = false
-    @State private var eventName = ""
-    @State private var venueName = ""
+    @State private var showFinishSheet: Bool
+    @State private var eventName: String
+    @State private var venueName: String
+
+    init() {
+        #if DEBUG
+        let isSummaryCapture = MarketingCapture.isActive && MarketingCapture.showFinishSheetOnAppear
+        _showFinishSheet = State(initialValue: isSummaryCapture)
+        _eventName = State(initialValue: isSummaryCapture ? "SUMMER SONIC 2026" : "")
+        _venueName = State(initialValue: isSummaryCapture ? "ZOZOマリンスタジアム" : "")
+        #else
+        _showFinishSheet = State(initialValue: false)
+        _eventName = State(initialValue: "")
+        _venueName = State(initialValue: "")
+        #endif
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -51,7 +64,7 @@ struct PassingSessionView: View {
             }
             .frame(height: 360)
             Text("近くの音楽を探しています").font(.title2.bold())
-            Text(nearbyService.connectedPeerCount > 0 ? "近くに \(nearbyService.connectedPeerCount) 台のPASSINGを検出" : "BluetoothとWi-Fiをオンにしてください")
+            Text(nearbyStatusText)
                 .font(.subheadline)
                 .foregroundStyle(PassingColors.secondaryText)
                 .padding(.top, 7)
@@ -75,6 +88,12 @@ struct PassingSessionView: View {
         .passingBackground()
         .navigationBarBackButtonHidden()
         .onAppear {
+            #if DEBUG
+            if MarketingCapture.isActive {
+                animateRings = true
+                return
+            }
+            #endif
             store.startPassing()
             locationService.startTracking()
             nearbyService.start(song: store.todaySong, location: locationService.lastLocation)
@@ -113,9 +132,21 @@ struct PassingSessionView: View {
     }
 
     private var statusText: String {
+        #if DEBUG
+        if MarketingCapture.isActive { return "位置情報・近距離通信を使用中" }
+        #endif
         if !locationService.isTracking { return "位置情報の許可を確認中" }
         if nearbyService.isRunning { return "位置情報・近距離通信を使用中" }
         return "近距離通信を準備中"
+    }
+
+    private var nearbyStatusText: String {
+        #if DEBUG
+        if MarketingCapture.isActive { return "会場内のPASSINGを検出しています" }
+        #endif
+        return nearbyService.connectedPeerCount > 0
+            ? "近くに \(nearbyService.connectedPeerCount) 台のPASSINGを検出"
+            : "BluetoothとWi-Fiをオンにしてください"
     }
 
     private func counter(value: Int, label: String) -> some View {

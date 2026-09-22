@@ -8,11 +8,21 @@ struct ContentView: View {
 
     var body: some View {
         Group {
+            #if DEBUG
+            if MarketingCapture.isActive {
+                MarketingCaptureHost()
+            } else if store.hasCompletedOnboarding {
+                MainTabView()
+            } else {
+                OnboardingView()
+            }
+            #else
             if store.hasCompletedOnboarding {
                 MainTabView()
             } else {
                 OnboardingView()
             }
+            #endif
         }
         .environmentObject(store)
         .environmentObject(previewPlayer)
