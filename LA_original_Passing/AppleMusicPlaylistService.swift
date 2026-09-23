@@ -16,6 +16,11 @@ final class AppleMusicPlaylistService: ObservableObject {
         UserDefaults.standard.string(forKey: idKey(for: memoryID)) != nil
     }
 
+    static func clearSavedPlaylist(for memoryID: UUID) {
+        UserDefaults.standard.removeObject(forKey: idKey(for: memoryID))
+        UserDefaults.standard.removeObject(forKey: nameKey(for: memoryID))
+    }
+
     func createOrUpdatePlaylist(from memory: PassingMemory, named playlistName: String) async -> Bool {
         let trimmedName = playlistName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else {

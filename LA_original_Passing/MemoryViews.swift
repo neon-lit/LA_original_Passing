@@ -2,7 +2,11 @@ import SwiftUI
 
 struct MemoryListView: View {
     @EnvironmentObject private var store: PassingStore
+    @State private var displayMode: MemoryDisplayMode = .list
     @State private var sortOrder: MemorySortOrder = .newest
+    @State private var selectedMemory: PassingMemory?
+    @State private var displayedMonth = Date.now
+    @State private var dayMemorySelection: DayMemorySelection?
 
     private var sortedMemories: [PassingMemory] {
         switch sortOrder {
@@ -18,42 +22,271 @@ struct MemoryListView: View {
     }
 
     var body: some View {
-        ScrollView {
-            if sortedMemories.isEmpty {
-                ContentUnavailableView(
-                    "まだメモリーがありません",
-                    systemImage: "sparkles.rectangle.stack",
-                    description: Text("PASSINGを終了すると、出会った曲と場所がここに保存されます。")
-                )
-                .padding(.top, 120)
-            } else {
-                LazyVStack(spacing: 14) {
-                    ForEach(sortedMemories) { memory in
-                        NavigationLink(value: memory) { MemoryCard(memory: memory) }
-                            .buttonStyle(.plain)
-                    }
+        VStack(spacing: 0) {
+            Picker("表示方法", selection: $displayMode) {
+                ForEach(MemoryDisplayMode.allCases) { mode in
+                    Label(mode.title, systemImage: mode.symbol).tag(mode)
                 }
-                .padding(20)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+
+            Group {
+                if store.memories.isEmpty {
+                    ContentUnavailableView(
+                        "まだメモリーがありません",
+                        systemImage: "sparkles.rectangle.stack",
+                        description: Text("PASSINGを終了すると、出会った曲と場所がここに保存されます。")
+                    )
+                } else if displayMode == .list {
+                    List {
+                        ForEach(sortedMemories) { memory in
+                            Button {
+                                selectedMemory = memory
+                            } label: {
+                                MemoryCard(memory: memory)
+                            }
+                                .listRowInsets(EdgeInsets(top: 7, leading: 20, bottom: 7, trailing: 20))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                                .buttonStyle(.plain)
+                        }
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                } else {
+                    MemoryCalendarView(
+                        memories: store.memories,
+                        displayedMonth: $displayedMonth,
+                        onSelect: selectMemories
+                    )
+                }
             }
         }
         .navigationTitle("メモリー")
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Picker("表示順", selection: $sortOrder) {
-                        ForEach(MemorySortOrder.allCases) { order in
-                            Label(order.title, systemImage: order.symbol).tag(order)
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                if displayMode == .list, !store.memories.isEmpty {
+                    Menu {
+                        Picker("表示順", selection: $sortOrder) {
+                            ForEach(MemorySortOrder.allCases) { order in
+                                Label(order.title, systemImage: order.symbol).tag(order)
+                            }
                         }
+                    } label: {
+                        Label("並び替え", systemImage: "arrow.up.arrow.down")
                     }
-                } label: {
-                    Label("並び替え", systemImage: "arrow.up.arrow.down")
                 }
             }
         }
-        .navigationDestination(for: PassingMemory.self) { memory in
+        .navigationDestination(item: $selectedMemory) { memory in
             MemoryDetailView(memory: memory)
         }
+        .sheet(item: $dayMemorySelection) { selection in
+            NavigationStack {
+                List(selection.memories) { memory in
+                    NavigationLink {
+                        MemoryDetailView(memory: memory)
+                    } label: {
+                        MemoryCard(memory: memory)
+                    }
+                    .buttonStyle(.plain)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .navigationTitle("この日のメモリー")
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("閉じる") { dayMemorySelection = nil }
+                    }
+                }
+                .passingBackground()
+            }
+            .presentationDetents([.medium, .large])
+        }
         .passingBackground()
+    }
+
+    private func selectMemories(_ memories: [PassingMemory]) {
+        guard !memories.isEmpty else { return }
+        dayMemorySelection = DayMemorySelection(
+            memories: memories.sorted { $0.date > $1.date }
+        )
+    }
+}
+
+private struct DayMemorySelection: Identifiable {
+    let id = UUID()
+    let memories: [PassingMemory]
+}
+
+private enum MemoryDisplayMode: String, CaseIterable, Identifiable {
+    case list
+    case calendar
+
+    var id: String { rawValue }
+    var title: String { self == .list ? "一覧" : "カレンダー" }
+    var symbol: String { self == .list ? "rectangle.grid.1x2" : "calendar" }
+}
+
+private struct MemoryCalendarView: View {
+    let memories: [PassingMemory]
+    @Binding var displayedMonth: Date
+    let onSelect: ([PassingMemory]) -> Void
+
+    private let calendar = Calendar.current
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 5), count: 7)
+
+    private var memoriesByDay: [Date: [PassingMemory]] {
+        Dictionary(grouping: memories) { calendar.startOfDay(for: $0.date) }
+    }
+
+    private var monthDays: [Date?] {
+        guard let monthInterval = calendar.dateInterval(of: .month, for: displayedMonth),
+              let dayRange = calendar.range(of: .day, in: .month, for: displayedMonth) else { return [] }
+
+        let firstWeekday = calendar.component(.weekday, from: monthInterval.start)
+        let leadingEmptyDays = (firstWeekday - calendar.firstWeekday + 7) % 7
+        let dates = dayRange.compactMap { day in
+            calendar.date(byAdding: .day, value: day - 1, to: monthInterval.start)
+        }
+        return Array(repeating: nil, count: leadingEmptyDays) + dates
+    }
+
+    private var weekdaySymbols: [String] {
+        let symbols = calendar.veryShortStandaloneWeekdaySymbols
+        let startIndex = max(calendar.firstWeekday - 1, 0)
+        return Array(symbols[startIndex...] + symbols[..<startIndex])
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                HStack {
+                    Button { moveMonth(by: -1) } label: {
+                        Image(systemName: "chevron.left")
+                            .frame(width: 42, height: 42)
+                    }
+                    Spacer()
+                    Text(displayedMonth.formatted(.dateTime.year().month(.wide)))
+                        .font(.title2.bold())
+                    Spacer()
+                    Button { moveMonth(by: 1) } label: {
+                        Image(systemName: "chevron.right")
+                            .frame(width: 42, height: 42)
+                    }
+                }
+
+                LazyVGrid(columns: columns, spacing: 6) {
+                    ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { index, symbol in
+                        Text(symbol)
+                            .font(.caption2.bold())
+                            .foregroundStyle(index == 0 ? .red.opacity(0.8) : PassingColors.secondaryText)
+                            .frame(maxWidth: .infinity)
+                    }
+
+                    ForEach(Array(monthDays.enumerated()), id: \.offset) { _, date in
+                        if let date {
+                            calendarDay(date)
+                        } else {
+                            Color.clear.frame(height: 68)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 30)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private func calendarDay(_ date: Date) -> some View {
+        let dayMemories = memoriesByDay[calendar.startOfDay(for: date)] ?? []
+        let isToday = calendar.isDateInToday(date)
+
+        return Button {
+            onSelect(dayMemories)
+        } label: {
+            VStack(spacing: 4) {
+                Text(date.formatted(.dateTime.day()))
+                    .font(.caption2.bold())
+                    .foregroundStyle(isToday ? .black : .white)
+                    .frame(width: 22, height: 18)
+                    .background(isToday ? PassingColors.lime : .clear, in: Capsule())
+
+                if let memory = dayMemories.first {
+                    ZStack(alignment: .bottomTrailing) {
+                        MemoryPlaylistArtwork(memory: memory, size: 43)
+                        if dayMemories.count > 1 {
+                            Text("+\(dayMemories.count - 1)")
+                                .font(.system(size: 9, weight: .black))
+                                .foregroundStyle(.white)
+                                .padding(4)
+                                .background(.black.opacity(0.75), in: Circle())
+                                .offset(x: 3, y: 3)
+                        }
+                    }
+                } else {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(.white.opacity(0.035))
+                        .frame(width: 43, height: 43)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 68)
+        }
+        .buttonStyle(.plain)
+        .disabled(dayMemories.isEmpty)
+    }
+
+    private func moveMonth(by value: Int) {
+        guard let nextMonth = calendar.date(byAdding: .month, value: value, to: displayedMonth) else { return }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            displayedMonth = nextMonth
+        }
+    }
+}
+
+private struct MemoryPlaylistArtwork: View {
+    let memory: PassingMemory
+    let size: CGFloat
+
+    private var songs: [EncounteredSong] {
+        Array(memory.songs.prefix(4))
+    }
+
+    var body: some View {
+        Group {
+            if songs.isEmpty {
+                ZStack {
+                    LinearGradient(colors: [PassingColors.violet, PassingColors.lime], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    Image(systemName: "music.note.list")
+                        .foregroundStyle(.white)
+                }
+            } else if songs.count == 1, let item = songs.first {
+                CoverArt(song: item.song, size: size)
+            } else {
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.fixed((size - 1) / 2), spacing: 1), count: 2),
+                    spacing: 1
+                ) {
+                    ForEach(songs) { item in
+                        CoverArt(song: item.song, size: (size - 1) / 2)
+                    }
+                }
+                .frame(width: size, height: size, alignment: .topLeading)
+                .background(PassingColors.surface)
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(.white.opacity(0.14), lineWidth: 0.7)
+        }
     }
 }
 
@@ -100,7 +333,6 @@ private struct MemoryCard: View {
                         .foregroundStyle(PassingColors.secondaryText)
                 }
                 Spacer()
-                Image(systemName: "chevron.right").foregroundStyle(PassingColors.secondaryText)
             }
             HStack(spacing: -12) {
                 ForEach(Array(memory.songs.prefix(4))) { item in
@@ -121,9 +353,11 @@ struct MemoryDetailView: View {
     let memory: PassingMemory
     @EnvironmentObject private var store: PassingStore
     @Environment(\.openURL) private var openURL
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var playlistService = AppleMusicPlaylistService()
     @State private var showPlaylistNameSheet = false
     @State private var showMemoryNameSheet = false
+    @State private var showDeleteConfirmation = false
     @State private var playlistName: String
     @State private var memoryName: String
     @State private var hasCreatedPlaylist: Bool
@@ -161,7 +395,11 @@ struct MemoryDetailView: View {
                 Text("出会った曲").font(.title3.bold()).padding(.top, 6)
                 LazyVStack(spacing: 10) {
                     ForEach(memory.songs) { item in
-                        NavigationLink(value: item) { SongRow(item: item) }
+                        NavigationLink {
+                            SongDetailView(item: item)
+                        } label: {
+                            SongRow(item: item)
+                        }
                             .buttonStyle(.plain)
                     }
                 }
@@ -171,15 +409,22 @@ struct MemoryDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showMemoryNameSheet = true
+                Menu {
+                    Button {
+                        showMemoryNameSheet = true
+                    } label: {
+                        Label("メモリー名を変更", systemImage: "pencil")
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        showDeleteConfirmation = true
+                    } label: {
+                        Label("メモリーを削除", systemImage: "trash")
+                    }
                 } label: {
-                    Label("メモリー名を変更", systemImage: "pencil")
+                    Label("メモリーを編集", systemImage: "ellipsis.circle")
                 }
             }
-        }
-        .navigationDestination(for: EncounteredSong.self) { item in
-            SongDetailView(item: item)
         }
         .passingBackground()
         .sheet(isPresented: $showPlaylistNameSheet) {
@@ -191,6 +436,19 @@ struct MemoryDetailView: View {
             memoryNameSheet
                 .presentationDetents([.height(310)])
                 .presentationDragIndicator(.visible)
+        }
+        .confirmationDialog(
+            "このメモリーを削除しますか？",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("削除", role: .destructive) {
+                store.deleteMemories(ids: [memory.id])
+                dismiss()
+            }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("削除したメモリーは元に戻せません。")
         }
     }
 
@@ -278,8 +536,20 @@ private struct SongRow: View {
         HStack(spacing: 14) {
             CoverArt(song: item.song, size: 62)
             VStack(alignment: .leading, spacing: 5) {
-                Text(item.song.title).font(.headline)
+                HStack(spacing: 7) {
+                    Text(item.song.title)
+                        .font(.headline)
+                        .lineLimit(1)
+                    if item.recommendationCount > 1 {
+                        RecommendationCountBadge(count: item.recommendationCount)
+                    }
+                }
                 Text(item.song.artist).font(.subheadline).foregroundStyle(PassingColors.secondaryText)
+                if item.recommendationCount > 1 {
+                    Text("\(item.recommendationCount)人から届いた曲")
+                        .font(.caption.bold())
+                        .foregroundStyle(PassingColors.lime)
+                }
             }
             Spacer()
             Image(systemName: "chevron.right").font(.caption).foregroundStyle(PassingColors.secondaryText)
@@ -287,6 +557,12 @@ private struct SongRow: View {
         .padding(10)
         .background(PassingColors.surface)
         .clipShape(RoundedRectangle(cornerRadius: 17))
+        .overlay {
+            if item.recommendationCount > 1 {
+                RoundedRectangle(cornerRadius: 17)
+                    .stroke(PassingColors.lime.opacity(0.5), lineWidth: 1)
+            }
+        }
     }
 }
 
@@ -301,8 +577,13 @@ struct SongDetailView: View {
         VStack(spacing: 0) {
             Spacer()
             CoverArt(song: item.song, size: 280)
-            Text(item.song.title)
-                .font(.system(size: 31, weight: .black, design: .rounded))
+            HStack(spacing: 9) {
+                Text(item.song.title)
+                    .font(.system(size: 31, weight: .black, design: .rounded))
+                if item.recommendationCount > 1 {
+                    RecommendationCountBadge(count: item.recommendationCount)
+                }
+            }
                 .padding(.top, 34)
             Text(item.song.artist)
                 .font(.title3)
@@ -312,6 +593,12 @@ struct SongDetailView: View {
                 .font(.subheadline.bold())
                 .foregroundStyle(PassingColors.lime)
                 .padding(.top, 18)
+            if item.recommendationCount > 1 {
+                Label("\(item.recommendationCount)人から届いた曲", systemImage: "person.2.fill")
+                    .font(.subheadline.bold())
+                    .foregroundStyle(PassingColors.secondaryText)
+                    .padding(.top, 10)
+            }
             Spacer()
             Button { previewPlayer.toggle(song: item.song) } label: {
                 PreviewButtonLabel(song: item.song, title: "試聴する")
@@ -319,6 +606,7 @@ struct SongDetailView: View {
                 .buttonStyle(PrimaryButtonStyle(destructive: true))
                 .disabled(item.song.previewURL == nil)
             Button {
+                previewPlayer.stop()
                 Task {
                     isOpeningAppleMusic = true
                     if let url = await AppleMusicLinkResolver.resolveURL(for: item.song) {
@@ -348,5 +636,18 @@ struct SongDetailView: View {
         } message: {
             Text("この曲のApple Musicリンクを取得できませんでした。")
         }
+    }
+}
+
+private struct RecommendationCountBadge: View {
+    let count: Int
+
+    var body: some View {
+        Text("+\(count)")
+            .font(.caption.bold().monospacedDigit())
+            .foregroundStyle(PassingColors.lime)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(PassingColors.lime.opacity(0.14), in: Capsule())
     }
 }

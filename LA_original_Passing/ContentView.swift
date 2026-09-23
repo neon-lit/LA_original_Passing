@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var store = PassingStore()
     @StateObject private var previewPlayer = PreviewPlayer()
     @StateObject private var locationService = LocationService()
@@ -29,6 +30,12 @@ struct ContentView: View {
         .environmentObject(locationService)
         .environmentObject(nearbyPassingService)
         .preferredColorScheme(.dark)
+        .dismissesKeyboardOnOutsideTap()
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active {
+                previewPlayer.stop()
+            }
+        }
         .alert(
             "試聴できません",
             isPresented: Binding(

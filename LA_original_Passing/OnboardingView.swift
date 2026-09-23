@@ -3,6 +3,7 @@ import SwiftUI
 struct OnboardingView: View {
     @EnvironmentObject private var store: PassingStore
     @EnvironmentObject private var locationService: LocationService
+    @EnvironmentObject private var previewPlayer: PreviewPlayer
     @State private var step = 0
 
     var body: some View {
@@ -67,6 +68,9 @@ struct OnboardingView: View {
             .padding(24)
         }
         .passingBackground()
+        .onChange(of: step) { _, _ in
+            previewPlayer.stop()
+        }
     }
 }
 

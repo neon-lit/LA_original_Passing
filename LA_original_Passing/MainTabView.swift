@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainTabView: View {
     @EnvironmentObject private var store: PassingStore
+    @EnvironmentObject private var previewPlayer: PreviewPlayer
 
     var body: some View {
         TabView(selection: $store.selectedTab) {
@@ -13,6 +14,9 @@ struct MainTabView: View {
                 .tag(AppTab.memory)
         }
         .tint(PassingColors.lime)
+        .onChange(of: store.selectedTab) { _, _ in
+            previewPlayer.stop()
+        }
     }
 }
 
@@ -34,6 +38,7 @@ struct HomeView: View {
                         .background(PassingColors.surface)
                         .clipShape(Circle())
                 }
+                .simultaneousGesture(TapGesture().onEnded { previewPlayer.stop() })
             }
             .padding(.horizontal, 22)
             Spacer()
@@ -53,7 +58,12 @@ struct HomeView: View {
                     PreviewButtonLabel(song: store.todaySong)
                 }
                 .disabled(store.todaySong.previewURL == nil)
-                Button { showSongPicker = true } label: { Label("曲を変更", systemImage: "arrow.triangle.2.circlepath") }
+                Button {
+                    previewPlayer.stop()
+                    showSongPicker = true
+                } label: {
+                    Label("曲を変更", systemImage: "arrow.triangle.2.circlepath")
+                }
             }
             .buttonStyle(HomeCapsuleButtonStyle())
             .padding(.top, 24)
@@ -66,13 +76,15 @@ struct HomeView: View {
                     Text("PASSING開始")
                 }
             }
+            .simultaneousGesture(TapGesture().onEnded { previewPlayer.stop() })
             .buttonStyle(PrimaryButtonStyle())
             .padding(.horizontal, 22)
             .padding(.bottom, 14)
         }
         .padding(.top, 8)
         .passingBackground()
-        .sheet(isPresented: $showSongPicker) { SongPickerSheet() }
+        .sheet(isPresented: $showSongPicker, onDismiss: { previewPlayer.stop() }) { SongPickerSheet() }
+        .onDisappear { previewPlayer.stop() }
     }
 }
 
@@ -144,7 +156,10 @@ struct SongPickerSheet: View {
             .navigationTitle("今日の1曲を変更")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("閉じる") { dismiss() }
+                    Button("閉じる") {
+                        previewPlayer.stop()
+                        dismiss()
+                    }
                 }
             }
             .passingBackground()

@@ -73,11 +73,25 @@ struct EncounteredSong: Identifiable, Hashable, Codable {
     let id: UUID
     let song: Song
     let encounteredAt: Date
+    var recommendationCount: Int
 
-    init(id: UUID = UUID(), song: Song, encounteredAt: Date) {
+    init(id: UUID = UUID(), song: Song, encounteredAt: Date, recommendationCount: Int = 1) {
         self.id = id
         self.song = song
         self.encounteredAt = encounteredAt
+        self.recommendationCount = recommendationCount
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, song, encounteredAt, recommendationCount
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        song = try container.decode(Song.self, forKey: .song)
+        encounteredAt = try container.decode(Date.self, forKey: .encounteredAt)
+        recommendationCount = try container.decodeIfPresent(Int.self, forKey: .recommendationCount) ?? 1
     }
 }
 

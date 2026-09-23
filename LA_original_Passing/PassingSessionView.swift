@@ -9,6 +9,7 @@ struct PassingSessionView: View {
     @State private var showFinishSheet: Bool
     @State private var eventName: String
     @State private var venueName: String
+    @State private var duplicateNotice: DuplicateEncounterNotice?
 
     init() {
         #if DEBUG
@@ -68,6 +69,33 @@ struct PassingSessionView: View {
                 .font(.subheadline)
                 .foregroundStyle(PassingColors.secondaryText)
                 .padding(.top, 7)
+            if let duplicateNotice {
+                HStack(spacing: 12) {
+                    CoverArt(song: duplicateNotice.song, size: 46)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("同じ曲とすれ違いました")
+                            .font(.caption.bold())
+                            .foregroundStyle(PassingColors.lime)
+                        Text(duplicateNotice.song.title)
+                            .font(.headline)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Text("+\(duplicateNotice.count)")
+                        .font(.title3.bold().monospacedDigit())
+                        .foregroundStyle(PassingColors.lime)
+                }
+                .padding(12)
+                .background(PassingColors.lime.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(PassingColors.lime.opacity(0.45), lineWidth: 1)
+                }
+                .padding(.horizontal, 22)
+                .padding(.top, 12)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
             HStack(spacing: 0) {
                 counter(value: store.sessionPeopleCount, label: "人とすれ違い")
                 Divider().frame(height: 45).overlay(.white.opacity(0.16))
@@ -104,11 +132,24 @@ struct PassingSessionView: View {
         }
         .onReceive(nearbyService.$encounters) { encounters in
             for encounter in encounters {
-                store.recordEncounter(
+                let result = store.recordEncounter(
                     song: encounter.song,
                     peerID: encounter.id,
                     encounteredAt: encounter.encounteredAt
                 )
+                if case let .duplicate(song, count) = result {
+                    withAnimation(.spring(response: 0.35)) {
+                        duplicateNotice = DuplicateEncounterNotice(song: song, count: count)
+                    }
+                }
+            }
+        }
+        .task(id: duplicateNotice?.id) {
+            guard duplicateNotice != nil else { return }
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            withAnimation {
+                duplicateNotice = nil
             }
         }
         .sheet(isPresented: $showFinishSheet) {
@@ -186,4 +227,10 @@ struct PassingSessionView: View {
         .padding(24)
         .passingBackground()
     }
+}
+
+private struct DuplicateEncounterNotice: Identifiable {
+    let id = UUID()
+    let song: Song
+    let count: Int
 }

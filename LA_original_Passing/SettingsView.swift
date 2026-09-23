@@ -5,6 +5,7 @@ import CoreLocation
 struct SettingsView: View {
     @EnvironmentObject private var store: PassingStore
     @EnvironmentObject private var locationService: LocationService
+    @EnvironmentObject private var previewPlayer: PreviewPlayer
     @Environment(\.openURL) private var openURL
     @State private var showSongPicker = false
 
@@ -30,15 +31,15 @@ struct SettingsView: View {
                 Toggle(isOn: $store.notificationsEnabled) { Label("通知", systemImage: "bell.fill") }
             }
             Section("音楽") {
-                Button { showSongPicker = true } label: {
+                Button {
+                    previewPlayer.stop()
+                    showSongPicker = true
+                } label: {
                     HStack {
                         Label("今日の1曲", systemImage: "waveform")
                         Spacer()
                         Text(store.todaySong.title).foregroundStyle(.secondary).lineLimit(1)
                     }
-                }
-                NavigationLink { GenreSettingsView() } label: {
-                    Label("好きな音楽ジャンル", systemImage: "guitars.fill")
                 }
             }
             Section("PASSINGについて") {
@@ -58,30 +59,7 @@ struct SettingsView: View {
         .scrollContentBackground(.hidden)
         .navigationTitle("設定")
         .passingBackground()
-        .sheet(isPresented: $showSongPicker) { SongPickerSheet() }
-    }
-}
-
-private struct GenreSettingsView: View {
-    @EnvironmentObject private var store: PassingStore
-
-    var body: some View {
-        List(MusicGenre.allCases) { genre in
-            Button {
-                if store.selectedGenres.contains(genre) { store.selectedGenres.remove(genre) }
-                else { store.selectedGenres.insert(genre) }
-            } label: {
-                HStack {
-                    Text(genre.rawValue)
-                    Spacer()
-                    if store.selectedGenres.contains(genre) {
-                        Image(systemName: "checkmark").foregroundStyle(PassingColors.lime)
-                    }
-                }
-            }
-        }
-        .scrollContentBackground(.hidden)
-        .navigationTitle("好きなジャンル")
-        .passingBackground()
+        .sheet(isPresented: $showSongPicker, onDismiss: { previewPlayer.stop() }) { SongPickerSheet() }
+        .onDisappear { previewPlayer.stop() }
     }
 }

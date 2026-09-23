@@ -136,6 +136,14 @@ enum AppleMusicLinkResolver {
         return await searchResult(for: song).map { String($0.trackID) }
     }
 
+    static func resolveArtworkURL(for song: Song, refresh: Bool = false) async -> URL? {
+        if !refresh, let artworkURL = song.artworkURL {
+            return artworkURL
+        }
+
+        return await searchResult(for: song)?.largeArtworkURL
+    }
+
     private static func searchResult(for song: Song) async -> AppleMusicSearchResult? {
         do {
             var components = URLComponents(string: "https://itunes.apple.com/search")
@@ -164,11 +172,12 @@ enum AppleMusicLinkResolver {
 }
 
 @MainActor
-final class PreviewPlayer: ObservableObject {
+final class PreviewPlayer: NSObject, ObservableObject {
     @Published private(set) var playingSongID: UUID?
     @Published private(set) var loadingSongID: UUID?
     @Published private(set) var errorMessage: String?
     private var player: AVPlayer?
+    private weak var observedPlayerItem: AVPlayerItem?
 
     func toggle(song: Song) {
         guard let previewURL = song.previewURL else { return }
@@ -185,6 +194,14 @@ final class PreviewPlayer: ObservableObject {
     }
 
     func stop() {
+        if let observedPlayerItem {
+            NotificationCenter.default.removeObserver(
+                self,
+                name: .AVPlayerItemDidPlayToEndTime,
+                object: observedPlayerItem
+            )
+            self.observedPlayerItem = nil
+        }
         player?.pause()
         player = nil
         playingSongID = nil
@@ -207,10 +224,18 @@ final class PreviewPlayer: ObservableObject {
                 throw PreviewPlaybackError.unplayable
             }
 
-            let player = AVPlayer(playerItem: AVPlayerItem(asset: asset))
+            let playerItem = AVPlayerItem(asset: asset)
+            let player = AVPlayer(playerItem: playerItem)
             player.volume = 1
             player.automaticallyWaitsToMinimizeStalling = true
             self.player = player
+            observedPlayerItem = playerItem
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(playbackDidFinish),
+                name: .AVPlayerItemDidPlayToEndTime,
+                object: playerItem,
+            )
             loadingSongID = nil
             playingSongID = song.id
             player.play()
@@ -218,6 +243,12 @@ final class PreviewPlayer: ObservableObject {
             loadingSongID = nil
             playingSongID = nil
             errorMessage = "この曲の試聴音源を再生できませんでした。別の曲でもう一度お試しください。"
+        }
+    }
+
+    @objc nonisolated private func playbackDidFinish() {
+        Task { @MainActor [weak self] in
+            self?.stop()
         }
     }
 }
@@ -228,19 +259,24 @@ private enum PreviewPlaybackError: Error {
 
 private extension Song {
     init(searchResult: AppleMusicSearchResult) {
-        let largeArtworkURL = searchResult.artworkURL.flatMap {
-            URL(string: $0.absoluteString.replacingOccurrences(of: "100x100", with: "600x600"))
-        }
         self.init(
             title: searchResult.trackName,
             artist: searchResult.artistName,
             colors: [.indigo, .purple],
             symbol: "music.note",
             musicItemID: String(searchResult.trackID),
-            artworkURL: largeArtworkURL,
+            artworkURL: searchResult.largeArtworkURL,
             previewURL: searchResult.previewURL,
             appleMusicURL: searchResult.trackViewURL
         )
+    }
+}
+
+private extension AppleMusicSearchResult {
+    var largeArtworkURL: URL? {
+        artworkURL.flatMap {
+            URL(string: $0.absoluteString.replacingOccurrences(of: "100x100", with: "600x600"))
+        }
     }
 }
 
