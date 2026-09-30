@@ -28,7 +28,8 @@ struct PassingSessionView: View {
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("PASSING中").font(.headline)
+                    Text("PASSING中")
+                        .font(.headline)
                     HStack(spacing: 6) {
                         Circle()
                             .fill(locationService.isTracking ? PassingColors.lime : .orange)
@@ -39,11 +40,18 @@ struct PassingSessionView: View {
                     }
                 }
                 Spacer()
-                Text(store.sessionStartedAt ?? .now, style: .timer)
-                    .font(.subheadline.monospacedDigit().bold())
-                    .foregroundStyle(PassingColors.lime)
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text("経過時間")
+                        .font(.caption2)
+                        .foregroundStyle(PassingColors.secondaryText)
+                    Text(store.sessionStartedAt ?? .now, style: .timer)
+                        .font(.headline.monospacedDigit())
+                        .foregroundStyle(PassingColors.lime)
+                }
             }
-            .padding(22)
+            .passingCard(padding: 15)
+            .padding(.horizontal, 22)
+            .padding(.top, 12)
             Spacer()
             ZStack {
                 ForEach(0..<4) { index in
@@ -63,7 +71,7 @@ struct PassingSessionView: View {
                     .shadow(color: PassingColors.lime.opacity(0.75), radius: 30)
                     .overlay(Image(systemName: "music.note").foregroundStyle(.black).font(.title2.bold()))
             }
-            .frame(height: 360)
+            .frame(height: 330)
             Text("近くの音楽を探しています").font(.title2.bold())
             Text(nearbyStatusText)
                 .font(.subheadline)
@@ -97,13 +105,17 @@ struct PassingSessionView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
             HStack(spacing: 0) {
-                counter(value: store.sessionPeopleCount, label: "人とすれ違い")
-                Divider().frame(height: 45).overlay(.white.opacity(0.16))
-                counter(value: store.sessionSongs.count, label: "曲と出会いました")
+                counter(value: store.sessionPeopleCount, label: "人とすれ違い", symbol: "person.2.fill")
+                Divider().frame(height: 48).overlay(PassingColors.stroke)
+                counter(value: store.sessionSongs.count, label: "曲と出会いました", symbol: "music.note.list")
             }
             .padding(.vertical, 20)
             .background(PassingColors.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 22))
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(PassingColors.stroke, lineWidth: 1)
+            }
             .padding(22)
             Spacer()
             Button("PASSINGを終了") {
@@ -124,11 +136,8 @@ struct PassingSessionView: View {
             #endif
             store.startPassing()
             locationService.startTracking()
-            nearbyService.start(song: store.todaySong, location: locationService.lastLocation)
+            nearbyService.start(song: store.todaySong)
             animateRings = true
-        }
-        .onReceive(locationService.$lastLocation) { location in
-            nearbyService.updateLocation(location)
         }
         .onReceive(nearbyService.$encounters) { encounters in
             for encounter in encounters {
@@ -174,11 +183,11 @@ struct PassingSessionView: View {
 
     private var statusText: String {
         #if DEBUG
-        if MarketingCapture.isActive { return "位置情報・近距離通信を使用中" }
+        if MarketingCapture.isActive { return "Bluetooth・位置情報を使用中" }
         #endif
         if !locationService.isTracking { return "位置情報の許可を確認中" }
-        if nearbyService.isRunning { return "位置情報・近距離通信を使用中" }
-        return "近距離通信を準備中"
+        if nearbyService.isRunning { return "Bluetooth・位置情報を使用中" }
+        return "Bluetooth通信を準備中"
     }
 
     private var nearbyStatusText: String {
@@ -187,12 +196,18 @@ struct PassingSessionView: View {
         #endif
         return nearbyService.connectedPeerCount > 0
             ? "近くに \(nearbyService.connectedPeerCount) 台のPASSINGを検出"
-            : "BluetoothとWi-Fiをオンにしてください"
+            : "Bluetoothで近くのPASSINGを探しています"
     }
 
-    private func counter(value: Int, label: String) -> some View {
+    private func counter(value: Int, label: String, symbol: String) -> some View {
         VStack(spacing: 5) {
-            Text("\(value)").font(.system(size: 32, weight: .black, design: .rounded)).foregroundStyle(PassingColors.lime)
+            HStack(spacing: 7) {
+                Image(systemName: symbol)
+                    .font(.caption.bold())
+                Text("\(value)")
+                    .font(.system(size: 32, weight: .black, design: .rounded))
+            }
+            .foregroundStyle(PassingColors.lime)
             Text(label).font(.caption).foregroundStyle(PassingColors.secondaryText)
         }
         .frame(maxWidth: .infinity)

@@ -26,62 +26,97 @@ struct HomeView: View {
     @State private var showSongPicker = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                PassingLogo()
-                Spacer()
-                NavigationLink {
-                    SettingsView()
-                } label: {
-                    Image(systemName: "gearshape.fill")
-                        .frame(width: 42, height: 42)
-                        .background(PassingColors.surface)
-                        .clipShape(Circle())
+        ScrollView {
+            VStack(spacing: 26) {
+                HStack {
+                    PassingLogo()
+                    Spacer()
+                    NavigationLink {
+                        SettingsView()
+                    } label: {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .frame(width: 44, height: 44)
+                            .background(PassingColors.surfaceStrong)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(PassingColors.stroke, lineWidth: 1))
+                    }
+                    .simultaneousGesture(TapGesture().onEnded { previewPlayer.stop() })
                 }
-                .simultaneousGesture(TapGesture().onEnded { previewPlayer.stop() })
+                .padding(.top, 8)
+
+                VStack(spacing: 20) {
+                    Text("TODAY'S ONE SONG")
+                        .font(.caption.bold())
+                        .tracking(2.1)
+                        .foregroundStyle(PassingColors.lime)
+
+                    ZStack {
+                        Circle()
+                            .fill(PassingColors.lime.opacity(0.16))
+                            .frame(width: 260, height: 260)
+                            .blur(radius: 36)
+                        CoverArt(song: store.todaySong, size: 248)
+                    }
+
+                    VStack(spacing: 7) {
+                        Text(store.todaySong.title)
+                            .font(.system(size: 30, weight: .black, design: .rounded))
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.75)
+                        Text(store.todaySong.artist)
+                            .font(.title3)
+                            .foregroundStyle(PassingColors.secondaryText)
+                            .lineLimit(1)
+                    }
+                }
+
+                HStack(spacing: 10) {
+                    Button { previewPlayer.toggle(song: store.todaySong) } label: {
+                        PreviewButtonLabel(song: store.todaySong)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .disabled(store.todaySong.previewURL == nil)
+                    Button {
+                        previewPlayer.stop()
+                        showSongPicker = true
+                    } label: {
+                        Label("曲を変更", systemImage: "arrow.triangle.2.circlepath")
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .buttonStyle(HomeCapsuleButtonStyle())
+                .passingCard(padding: 10)
+
+                Label("Bluetoothで近くのPASSINGと1曲を交換します", systemImage: "dot.radiowaves.left.and.right")
+                    .font(.caption)
+                    .foregroundStyle(PassingColors.secondaryText)
+                    .multilineTextAlignment(.center)
             }
             .padding(.horizontal, 22)
-            Spacer()
-            Text("今日の1曲")
-                .font(.subheadline.bold())
-                .foregroundStyle(PassingColors.secondaryText)
-            CoverArt(song: store.todaySong, size: 248)
-                .padding(.vertical, 26)
-            Text(store.todaySong.title)
-                .font(.system(size: 29, weight: .bold, design: .rounded))
-            Text(store.todaySong.artist)
-                .font(.title3)
-                .foregroundStyle(PassingColors.secondaryText)
-                .padding(.top, 5)
-            HStack(spacing: 12) {
-                Button { previewPlayer.toggle(song: store.todaySong) } label: {
-                    PreviewButtonLabel(song: store.todaySong)
-                }
-                .disabled(store.todaySong.previewURL == nil)
-                Button {
-                    previewPlayer.stop()
-                    showSongPicker = true
-                } label: {
-                    Label("曲を変更", systemImage: "arrow.triangle.2.circlepath")
-                }
-            }
-            .buttonStyle(HomeCapsuleButtonStyle())
-            .padding(.top, 24)
-            Spacer()
+            .padding(.bottom, 110)
+        }
+        .scrollIndicators(.hidden)
+        .safeAreaInset(edge: .bottom) {
             NavigationLink {
                 PassingSessionView()
             } label: {
-                HStack {
+                HStack(spacing: 10) {
                     Image(systemName: "dot.radiowaves.left.and.right")
                     Text("PASSING開始")
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                        .font(.subheadline.bold())
                 }
+                .padding(.horizontal, 20)
             }
             .simultaneousGesture(TapGesture().onEnded { previewPlayer.stop() })
             .buttonStyle(PrimaryButtonStyle())
             .padding(.horizontal, 22)
-            .padding(.bottom, 14)
+            .padding(.vertical, 12)
+            .background(PassingColors.background.opacity(0.92))
         }
-        .padding(.top, 8)
         .passingBackground()
         .sheet(isPresented: $showSongPicker, onDismiss: { previewPlayer.stop() }) { SongPickerSheet() }
         .onDisappear { previewPlayer.stop() }
@@ -92,10 +127,10 @@ private struct HomeCapsuleButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.subheadline.bold())
-            .padding(.horizontal, 18)
-            .padding(.vertical, 12)
-            .background(PassingColors.surface)
-            .clipShape(Capsule())
+            .padding(.horizontal, 12)
+            .frame(height: 48)
+            .background(PassingColors.surfaceStrong)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .opacity(configuration.isPressed ? 0.6 : 1)
     }
 }

@@ -16,25 +16,37 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>Spotify Login</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>passing-spotify-login</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>spotify</string>
+	</array>
 	<key>NSAppleMusicUsageDescription</key>
 	<string>メモリーで出会った曲をApple Musicのプレイリストとして保存するために使用します。</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>近くでPASSINGを利用中の人と匿名で曲を交換するためにBluetoothを使用します。</string>
-	<key>NSBonjourServices</key>
-	<array>
-		<string>_passing-song._tcp</string>
-		<string>_passing-song._udp</string>
-	</array>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>近くでPASSINGを利用中の人と匿名で曲を交換するためにローカルネットワークを使用します。</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>PASSING中に近くにいたユーザーを判定するため、バックグラウンドでも位置情報を使用します。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>PASSING中に近くにいたユーザーを判定するため、位置情報を使用します。</string>
+	<key>SpotifyClientID</key>
+	<string>$(SPOTIFY_CLIENT_ID)</string>
+	<key>SpotifyRedirectURI</key>
+	<string>passing-spotify-login://callback</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -42,6 +54,8 @@
 	</dict>
 	<key>UIBackgroundModes</key>
 	<array>
+		<string>bluetooth-central</string>
+		<string>bluetooth-peripheral</string>
 		<string>location</string>
 	</array>
 	<key>UILaunchScreen</key>

@@ -3,11 +3,19 @@ import SwiftUI
 import UIKit
 
 enum PassingColors {
-    static let background = Color(red: 0.035, green: 0.04, blue: 0.065)
+    static let background = Color(red: 0.025, green: 0.035, blue: 0.075)
     static let surface = Color.white.opacity(0.075)
-    static let lime = Color(red: 0.24, green: 0.68, blue: 1.0)
-    static let violet = Color(red: 0.18, green: 0.38, blue: 0.92)
-    static let secondaryText = Color.white.opacity(0.58)
+    static let surfaceStrong = Color.white.opacity(0.105)
+    static let stroke = Color.white.opacity(0.10)
+    static let lime = Color(red: 0.20, green: 0.62, blue: 1.0)
+    static let cyan = Color(red: 0.18, green: 0.82, blue: 1.0)
+    static let violet = Color(red: 0.28, green: 0.32, blue: 0.96)
+    static let secondaryText = Color.white.opacity(0.62)
+    static let primaryGradient = LinearGradient(
+        colors: [lime, Color(red: 0.22, green: 0.45, blue: 1.0)],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
 }
 
 struct CoverArt: View {
@@ -163,34 +171,95 @@ struct PassingLogo: View {
 
 struct PrimaryButtonStyle: ButtonStyle {
     var destructive = false
+    @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.headline)
-            .foregroundStyle(destructive ? .white : .black)
+            .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .frame(height: 58)
-            .background(destructive ? Color.white.opacity(0.12) : PassingColors.lime)
+            .background(
+                destructive
+                    ? AnyShapeStyle(Color.white.opacity(0.11))
+                    : AnyShapeStyle(PassingColors.primaryGradient)
+            )
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(destructive ? PassingColors.stroke : .white.opacity(0.16), lineWidth: 1)
+            }
+            .shadow(
+                color: destructive ? .clear : PassingColors.lime.opacity(configuration.isPressed ? 0.12 : 0.28),
+                radius: 18,
+                y: 9
+            )
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .opacity(configuration.isPressed ? 0.85 : 1)
+            .opacity(!isEnabled ? 0.42 : configuration.isPressed ? 0.84 : 1)
             .animation(.spring(response: 0.25), value: configuration.isPressed)
+    }
+}
+
+struct PassingSectionHeader: View {
+    let title: String
+    var subtitle: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.headline)
+            if let subtitle {
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(PassingColors.secondaryText)
+            }
+        }
+    }
+}
+
+private struct PassingCardModifier: ViewModifier {
+    let padding: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .padding(padding)
+            .background(PassingColors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(PassingColors.stroke, lineWidth: 1)
+            }
     }
 }
 
 extension View {
     func passingBackground() -> some View {
         background {
-            PassingColors.background
+            LinearGradient(
+                colors: [PassingColors.background, Color(red: 0.025, green: 0.045, blue: 0.105)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
                 .ignoresSafeArea()
                 .overlay(alignment: .topTrailing) {
                     Circle()
-                        .fill(PassingColors.violet.opacity(0.18))
-                        .frame(width: 300)
-                        .blur(radius: 80)
-                        .offset(x: 130, y: -160)
+                        .fill(PassingColors.violet.opacity(0.20))
+                        .frame(width: 320)
+                        .blur(radius: 90)
+                        .offset(x: 145, y: -175)
+                }
+                .overlay(alignment: .bottomLeading) {
+                    Circle()
+                        .fill(PassingColors.lime.opacity(0.10))
+                        .frame(width: 280)
+                        .blur(radius: 100)
+                        .offset(x: -150, y: 150)
                 }
         }
+    }
+
+    func passingCard(padding: CGFloat = 16) -> some View {
+        modifier(PassingCardModifier(padding: padding))
     }
 
     func dismissesKeyboardOnOutsideTap() -> some View {

@@ -29,8 +29,15 @@ struct MemoryListView: View {
                 }
             }
             .pickerStyle(.segmented)
+            .padding(4)
+            .background(PassingColors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(PassingColors.stroke, lineWidth: 1)
+            }
             .padding(.horizontal, 20)
-            .padding(.vertical, 12)
+            .padding(.vertical, 10)
 
             Group {
                 if store.memories.isEmpty {
@@ -321,31 +328,39 @@ private struct MemoryCard: View {
     let memory: PassingMemory
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 15) {
+                MemoryPlaylistArtwork(memory: memory, size: 76)
+                VStack(alignment: .leading, spacing: 5) {
                     Text(memory.date.formatted(.dateTime.year().month().day()))
                         .font(.caption.bold())
                         .foregroundStyle(PassingColors.lime)
-                    Text(memory.eventName).font(.title3.bold()).multilineTextAlignment(.leading)
+                    Text(memory.eventName)
+                        .font(.title3.bold())
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
                     Label(memory.venue, systemImage: "mappin.and.ellipse")
                         .font(.caption)
                         .foregroundStyle(PassingColors.secondaryText)
+                        .lineLimit(1)
                 }
                 Spacer()
             }
-            HStack(spacing: -12) {
-                ForEach(Array(memory.songs.prefix(4))) { item in
-                    CoverArt(song: item.song, size: 52)
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(PassingColors.background, lineWidth: 3))
-                }
-                Spacer()
-                Text("\(memory.peopleCount)人 / \(memory.songs.count)曲").font(.subheadline.bold())
+            Divider().overlay(PassingColors.stroke)
+            HStack(spacing: 18) {
+                Label("\(memory.peopleCount)人", systemImage: "person.2.fill")
+                Label("\(memory.songs.count)曲", systemImage: "music.note.list")
             }
+            .font(.subheadline.bold())
+            .foregroundStyle(PassingColors.secondaryText)
         }
         .padding(18)
         .background(PassingColors.surface)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(PassingColors.stroke, lineWidth: 1)
+        }
     }
 }
 
@@ -355,16 +370,20 @@ struct MemoryDetailView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.dismiss) private var dismiss
     @StateObject private var playlistService = AppleMusicPlaylistService()
+    @StateObject private var spotifyPlaylistService = SpotifyPlaylistService()
     @State private var showPlaylistNameSheet = false
+    @State private var showSpotifyPlaylistSheet = false
     @State private var showMemoryNameSheet = false
     @State private var showDeleteConfirmation = false
     @State private var playlistName: String
+    @State private var spotifyPlaylistName: String
     @State private var memoryName: String
     @State private var hasCreatedPlaylist: Bool
 
     init(memory: PassingMemory) {
         self.memory = memory
         _playlistName = State(initialValue: AppleMusicPlaylistService.savedName(for: memory.id) ?? memory.eventName)
+        _spotifyPlaylistName = State(initialValue: memory.eventName)
         _memoryName = State(initialValue: memory.eventName)
         _hasCreatedPlaylist = State(initialValue: AppleMusicPlaylistService.hasPlaylist(for: memory.id))
     }
@@ -372,26 +391,72 @@ struct MemoryDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                VStack(alignment: .leading, spacing: 7) {
-                    Text(memory.date.formatted(.dateTime.year().month().day()))
-                        .font(.subheadline.bold())
-                        .foregroundStyle(PassingColors.lime)
-                    Text(memoryName).font(.system(size: 32, weight: .black, design: .rounded))
-                    Label(memory.venue, systemImage: "mappin.and.ellipse").foregroundStyle(PassingColors.secondaryText)
-                    Text("\(memory.peopleCount)人の \(memory.songs.count)曲と出会いました")
-                        .font(.headline)
-                        .padding(.top, 8)
+                HStack(spacing: 16) {
+                    MemoryPlaylistArtwork(memory: memory, size: 86)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(memory.date.formatted(.dateTime.year().month().day()))
+                            .font(.caption.bold())
+                            .foregroundStyle(PassingColors.lime)
+                        Text(memoryName)
+                            .font(.system(size: 27, weight: .black, design: .rounded))
+                            .lineLimit(2)
+                        Label(memory.venue, systemImage: "mappin.and.ellipse")
+                            .font(.caption)
+                            .foregroundStyle(PassingColors.secondaryText)
+                            .lineLimit(1)
+                    }
                 }
-                Button {
-                    playlistService.clearError()
-                    showPlaylistNameSheet = true
-                } label: {
-                    Label(
-                        hasCreatedPlaylist ? "プレイリスト名・内容を変更" : "Apple Musicにプレイリストを作成",
-                        systemImage: hasCreatedPlaylist ? "pencil.and.list.clipboard" : "music.note.list"
-                    )
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .passingCard(padding: 16)
+
+                HStack(spacing: 0) {
+                    memoryStat(value: memory.peopleCount, label: "人とすれ違い", symbol: "person.2.fill")
+                    Divider().frame(height: 42).overlay(PassingColors.stroke)
+                    memoryStat(value: memory.songs.count, label: "曲と出会いました", symbol: "music.note.list")
                 }
-                .buttonStyle(PrimaryButtonStyle())
+                .passingCard(padding: 14)
+                VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("プレイリストに保存")
+                            .font(.subheadline.bold())
+                        Text("この日に出会った曲をまとめて残せます")
+                            .font(.caption)
+                            .foregroundStyle(PassingColors.secondaryText)
+                    }
+                    .padding(.horizontal, 2)
+
+                    Button {
+                        playlistService.clearError()
+                        showPlaylistNameSheet = true
+                    } label: {
+                        StreamingServiceLabel(
+                            title: hasCreatedPlaylist ? "Apple Musicの内容を変更" : "Apple Musicに作成",
+                            systemImage: "apple.logo"
+                        )
+                    }
+                    .buttonStyle(StreamingServiceButtonStyle(
+                        background: Color(red: 0.98, green: 0.20, blue: 0.36),
+                        foreground: .white
+                    ))
+
+                    Button {
+                        spotifyPlaylistService.clearError()
+                        showSpotifyPlaylistSheet = true
+                    } label: {
+                        StreamingServiceLabel(title: "Spotifyに作成", systemImage: "waveform")
+                    }
+                    .buttonStyle(StreamingServiceButtonStyle(
+                        background: Color(red: 0.12, green: 0.84, blue: 0.38),
+                        foreground: .black
+                    ))
+                }
+                .padding(14)
+                .background(PassingColors.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(.white.opacity(0.07), lineWidth: 1)
+                }
                 Text("出会った曲").font(.title3.bold()).padding(.top, 6)
                 LazyVStack(spacing: 10) {
                     ForEach(memory.songs) { item in
@@ -437,6 +502,11 @@ struct MemoryDetailView: View {
                 .presentationDetents([.height(310)])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $showSpotifyPlaylistSheet) {
+            spotifyPlaylistSheet
+                .presentationDetents([.height(410)])
+                .presentationDragIndicator(.visible)
+        }
         .confirmationDialog(
             "このメモリーを削除しますか？",
             isPresented: $showDeleteConfirmation,
@@ -450,6 +520,22 @@ struct MemoryDetailView: View {
         } message: {
             Text("削除したメモリーは元に戻せません。")
         }
+    }
+
+    private func memoryStat(value: Int, label: String, symbol: String) -> some View {
+        VStack(spacing: 5) {
+            HStack(spacing: 6) {
+                Image(systemName: symbol)
+                    .font(.caption.bold())
+                Text("\(value)")
+                    .font(.title2.bold().monospacedDigit())
+            }
+            .foregroundStyle(PassingColors.lime)
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(PassingColors.secondaryText)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private var memoryNameSheet: some View {
@@ -471,6 +557,7 @@ struct MemoryDetailView: View {
                 if !hasCreatedPlaylist {
                     playlistName = trimmedName
                 }
+                spotifyPlaylistName = trimmedName
                 showMemoryNameSheet = false
             }
             .buttonStyle(PrimaryButtonStyle())
@@ -521,8 +608,67 @@ struct MemoryDetailView: View {
                     Label(hasCreatedPlaylist ? "変更を保存" : "この名前で作成", systemImage: "music.note.list")
                 }
             }
-            .buttonStyle(PrimaryButtonStyle())
+            .buttonStyle(StreamingServiceButtonStyle(
+                background: Color(red: 0.98, green: 0.20, blue: 0.36),
+                foreground: .white
+            ))
             .disabled(playlistService.isCreating || playlistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+        .padding(24)
+        .passingBackground()
+    }
+
+    private var spotifyPlaylistSheet: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("Spotifyプレイリストを作成")
+                .font(.title2.bold())
+            Text("プレイリスト名")
+                .font(.caption.bold())
+                .foregroundStyle(PassingColors.secondaryText)
+            TextField("プレイリスト名", text: $spotifyPlaylistName)
+                .textInputAutocapitalization(.never)
+                .padding(16)
+                .background(PassingColors.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+
+            if let errorMessage = spotifyPlaylistService.errorMessage {
+                Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            } else {
+                Text("Spotifyへログインし、このメモリーの曲を非公開プレイリストとして保存します。")
+                    .font(.caption)
+                    .foregroundStyle(PassingColors.secondaryText)
+            }
+
+            Spacer()
+            Button {
+                Task {
+                    if await spotifyPlaylistService.createPlaylist(
+                        from: memory,
+                        named: spotifyPlaylistName
+                    ) {
+                        showSpotifyPlaylistSheet = false
+                        if let spotifyURL = spotifyPlaylistService.playlistURL {
+                            openURL(spotifyURL)
+                        }
+                    }
+                }
+            } label: {
+                if spotifyPlaylistService.isCreating {
+                    Label("作成中", systemImage: "hourglass")
+                } else {
+                    Label("Spotifyに作成", systemImage: "music.note.list")
+                }
+            }
+            .buttonStyle(StreamingServiceButtonStyle(
+                background: Color(red: 0.12, green: 0.84, blue: 0.38),
+                foreground: .black
+            ))
+            .disabled(
+                spotifyPlaylistService.isCreating
+                    || spotifyPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            )
         }
         .padding(24)
         .passingBackground()
@@ -572,6 +718,7 @@ struct SongDetailView: View {
     @Environment(\.openURL) private var openURL
     @State private var isOpeningAppleMusic = false
     @State private var showAppleMusicError = false
+    @State private var showSpotifyError = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -605,27 +752,68 @@ struct SongDetailView: View {
             }
                 .buttonStyle(PrimaryButtonStyle(destructive: true))
                 .disabled(item.song.previewURL == nil)
-            Button {
-                previewPlayer.stop()
-                Task {
-                    isOpeningAppleMusic = true
-                    if let url = await AppleMusicLinkResolver.resolveURL(for: item.song) {
-                        openURL(url)
-                    } else {
-                        showAppleMusicError = true
+            VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("音楽サービスで聴く")
+                        .font(.subheadline.bold())
+                    Text("フル再生はお使いのサービスで")
+                        .font(.caption)
+                        .foregroundStyle(PassingColors.secondaryText)
+                }
+                .padding(.horizontal, 2)
+
+                Button {
+                    previewPlayer.stop()
+                    Task {
+                        isOpeningAppleMusic = true
+                        if let url = await AppleMusicLinkResolver.resolveURL(for: item.song) {
+                            openURL(url)
+                        } else {
+                            showAppleMusicError = true
+                        }
+                        isOpeningAppleMusic = false
                     }
-                    isOpeningAppleMusic = false
+                } label: {
+                    StreamingServiceLabel(
+                        title: isOpeningAppleMusic ? "Apple Musicを開いています" : "Apple Musicで聴く",
+                        systemImage: isOpeningAppleMusic ? "hourglass" : "apple.logo"
+                    )
                 }
-            } label: {
-                if isOpeningAppleMusic {
-                    Label("Apple Musicを開いています", systemImage: "hourglass")
-                } else {
-                    Label("Apple Musicで聴く", systemImage: "arrow.up.right")
-                }
-            }
-                .buttonStyle(PrimaryButtonStyle())
-                .padding(.top, 10)
+                .buttonStyle(StreamingServiceButtonStyle(
+                    background: Color(red: 0.98, green: 0.20, blue: 0.36),
+                    foreground: .white
+                ))
                 .disabled(isOpeningAppleMusic)
+
+                Button {
+                    previewPlayer.stop()
+                    let query = "\(item.song.title) \(item.song.artist)"
+                    guard let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
+                          let url = URL(string: "https://open.spotify.com/search/\(encodedQuery)") else {
+                        showSpotifyError = true
+                        return
+                    }
+                    openURL(url) { accepted in
+                        if !accepted {
+                            showSpotifyError = true
+                        }
+                    }
+                } label: {
+                    StreamingServiceLabel(title: "Spotifyで聴く", systemImage: "waveform")
+                }
+                .buttonStyle(StreamingServiceButtonStyle(
+                    background: Color(red: 0.12, green: 0.84, blue: 0.38),
+                    foreground: .black
+                ))
+            }
+            .padding(14)
+            .background(PassingColors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(.white.opacity(0.07), lineWidth: 1)
+            }
+            .padding(.top, 12)
         }
         .padding(22)
         .navigationBarTitleDisplayMode(.inline)
@@ -636,6 +824,48 @@ struct SongDetailView: View {
         } message: {
             Text("この曲のApple Musicリンクを取得できませんでした。")
         }
+        .alert("Spotifyで開けません", isPresented: $showSpotifyError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("SpotifyアプリまたはSpotifyのWebページを開けませんでした。")
+        }
+    }
+}
+
+private struct StreamingServiceLabel: View {
+    let title: String
+    let systemImage: String
+
+    var body: some View {
+        HStack(spacing: 11) {
+            Image(systemName: systemImage)
+                .font(.system(size: 18, weight: .semibold))
+                .frame(width: 24)
+            Text(title)
+            Spacer()
+            Image(systemName: "arrow.up.right")
+                .font(.caption.bold())
+                .opacity(0.7)
+        }
+    }
+}
+
+private struct StreamingServiceButtonStyle: ButtonStyle {
+    let background: Color
+    let foreground: Color
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline)
+            .foregroundStyle(foreground)
+            .padding(.horizontal, 17)
+            .frame(maxWidth: .infinity)
+            .frame(height: 54)
+            .background(background)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .opacity(configuration.isPressed ? 0.84 : 1)
+            .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
     }
 }
 
