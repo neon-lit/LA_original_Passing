@@ -89,7 +89,7 @@ struct HomeView: View {
                 .buttonStyle(HomeCapsuleButtonStyle())
                 .passingCard(padding: 10)
 
-                Label("Bluetoothで近くのPASSINGと1曲を交換します", systemImage: "dot.radiowaves.left.and.right")
+                Label("PASSING中はBluetooth LEで近くの人と1曲を交換します", systemImage: "dot.radiowaves.left.and.right")
                     .font(.caption)
                     .foregroundStyle(PassingColors.secondaryText)
                     .multilineTextAlignment(.center)

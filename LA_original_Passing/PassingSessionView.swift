@@ -195,8 +195,8 @@ struct PassingSessionView: View {
         if MarketingCapture.isActive { return "会場内のPASSINGを検出しています" }
         #endif
         return nearbyService.connectedPeerCount > 0
-            ? "近くに \(nearbyService.connectedPeerCount) 台のPASSINGを検出"
-            : "Bluetoothで近くのPASSINGを探しています"
+            ? "Bluetooth LEで近くに \(nearbyService.connectedPeerCount) 台のPASSINGを検出"
+            : "Bluetooth LEで近くのPASSINGを探しています"
     }
 
     private func counter(value: Int, label: String, symbol: String) -> some View {

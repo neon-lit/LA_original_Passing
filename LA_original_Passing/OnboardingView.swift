@@ -93,7 +93,7 @@ private struct WelcomeStep: View {
             Text("偶然の1曲と、\nすれ違おう。")
                 .font(.system(size: 42, weight: .black, design: .rounded))
                 .tracking(-1.5)
-            Text("ライブやフェスで近くにいた、知らない誰かの“届けたい1曲”と出会うアプリです。")
+            Text("ライブやフェスで近くにいた、知らない誰かの“届けたい1曲”と出会うアプリです。PASSING中はBluetooth LEで、近くの人と匿名で1曲を交換します。")
                 .font(.body)
                 .foregroundStyle(PassingColors.secondaryText)
                 .lineSpacing(7)
